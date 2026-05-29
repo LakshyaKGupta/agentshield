@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Node / frontend
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+
+# Local browser/test artifacts
+.playwright-mcp/
+
+# Environment files
+.env
+.env.*
+!.env.example
