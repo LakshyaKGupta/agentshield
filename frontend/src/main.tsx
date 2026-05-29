@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Activity, ArrowRight, Braces, CheckCircle2, Database, Eye, Fingerprint, KeyRound, Lock, Mail, Network, Radar, Shield, Terminal, UserRound, Zap } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, Braces, Database, Eye, Fingerprint, Layers, Lock, Mail, Network, Plug, Shield, Terminal, UserRound, Workflow, Zap } from "lucide-react";
 import * as THREE from "three";
 import "./styles.css";
 
@@ -72,19 +72,37 @@ function permissionSummary(agent: Agent) {
 }
 
 async function requestJson<T>(path: string, apiKey?: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { "X-AgentShield-API-Key": apiKey } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed: ${response.status}`);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      signal: options.signal || controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { "X-AgentShield-API-Key": apiKey } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    if (!response.ok) {
+      let message = `Request failed: ${response.status}`;
+      try {
+        const payload = await response.json();
+        message = payload?.error?.message || payload?.error?.code || message;
+      } catch {
+        message = (await response.text()) || message;
+      }
+      throw new Error(message);
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Backend request timed out. Check that the AgentShield API is running.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return response.json();
 }
 
 function useAgentShieldData() {
@@ -101,8 +119,9 @@ function useAgentShieldData() {
   const load = async () => {
     setData((current) => ({ ...current, loading: true, error: null }));
     try {
-      const health = await requestJson<{ demo_api_key: string }>("/health");
+      const health = await requestJson<{ demo_api_key: string | null }>("/health");
       const apiKey = health.demo_api_key;
+      if (!apiKey) throw new Error("Demo mode is disabled. Sign in with a workspace API key before loading live data.");
       let agents = (await requestJson<{ agents: Agent[] }>("/v1/agents", apiKey)).agents;
       if (agents.length === 0) {
         const seeds = [
@@ -187,28 +206,28 @@ function AgentNetworkScene() {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 0, 9);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setClearColor(0x0a0a1a, 0.24);
+    renderer.setClearColor(0xffffff, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
     host.appendChild(renderer.domElement);
 
     const group = new THREE.Group();
     scene.add(group);
-    scene.add(new THREE.AmbientLight(0x9ca3af, 0.8));
-    const point = new THREE.PointLight(0x22d3ee, 7, 24);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+    const point = new THREE.PointLight(0x2f80ed, 6, 24);
     point.position.set(1, 2.5, 5);
     scene.add(point);
-    const violet = new THREE.PointLight(0x8b5cf6, 4, 18);
+    const violet = new THREE.PointLight(0xf2c94c, 4, 18);
     violet.position.set(-3, -1, 4);
     scene.add(violet);
 
     const positions = [
-      [0, 0, 0, 0x8b5cf6, 0.58],
-      [-3.0, 1.45, -0.5, 0x22d3ee, 0.27],
-      [2.95, 1.22, -0.9, 0x2dd4bf, 0.3],
-      [-2.7, -1.65, 0.15, 0x10b981, 0.28],
-      [2.45, -1.85, -0.25, 0xf43f5e, 0.28],
-      [0.15, 2.72, -0.75, 0xc4b5fd, 0.23],
+      [0, 0, 0, 0x111111, 0.52],
+      [-3.0, 1.45, -0.5, 0x2f80ed, 0.27],
+      [2.95, 1.22, -0.9, 0xf2c94c, 0.3],
+      [-2.7, -1.65, 0.15, 0x56ccf2, 0.28],
+      [2.45, -1.85, -0.25, 0xf2994a, 0.28],
+      [0.15, 2.72, -0.75, 0x9bbcff, 0.23],
     ] as const;
 
     const nodes = positions.map(([x, y, z, color, size]) => {
@@ -223,23 +242,23 @@ function AgentNetworkScene() {
 
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.94, 0.012, 12, 100),
-      new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.78 })
+      new THREE.MeshBasicMaterial({ color: 0x2f80ed, transparent: true, opacity: 0.72 })
     );
     group.add(ring);
 
     const outerRing = new THREE.Mesh(
       new THREE.TorusGeometry(1.28, 0.006, 12, 100),
-      new THREE.MeshBasicMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.42 })
+      new THREE.MeshBasicMaterial({ color: 0xf2c94c, transparent: true, opacity: 0.42 })
     );
     outerRing.rotation.x = Math.PI / 2.4;
     group.add(outerRing);
 
-    const grid = new THREE.GridHelper(9, 18, 0x155e75, 0x1f2937);
+    const grid = new THREE.GridHelper(9, 18, 0xc9d7ef, 0xe8eaed);
     grid.position.y = -2.7;
     grid.rotation.x = 0.35;
     scene.add(grid);
 
-    const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.38 });
+    const material = new THREE.LineBasicMaterial({ color: 0x2f80ed, transparent: true, opacity: 0.32 });
     for (let i = 1; i < nodes.length; i += 1) {
       const geometry = new THREE.BufferGeometry().setFromPoints([nodes[0].position, nodes[i].position]);
       group.add(new THREE.Line(geometry, material));
@@ -248,7 +267,7 @@ function AgentNetworkScene() {
     const pulses = nodes.slice(1).map((node, index) => {
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.045, 16, 16),
-        new THREE.MeshBasicMaterial({ color: index === 3 ? 0xfb7185 : 0x67e8f9 })
+        new THREE.MeshBasicMaterial({ color: index === 3 ? 0xf2994a : 0x2f80ed })
       );
       group.add(mesh);
       return { mesh, target: node.position, offset: index / 5 };
@@ -259,7 +278,7 @@ function AgentNetworkScene() {
         "position",
         new THREE.Float32BufferAttribute(Array.from({ length: 240 }, () => (Math.random() - 0.5) * 10), 3)
       ),
-      new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.025, transparent: true, opacity: 0.45 })
+      new THREE.PointsMaterial({ color: 0x2f80ed, size: 0.025, transparent: true, opacity: 0.38 })
     );
     scene.add(particles);
 
@@ -299,38 +318,50 @@ function AgentNetworkScene() {
   return <div className="three-scene" ref={hostRef} aria-label="Animated 3D agent network" />;
 }
 
-function MarketingSite({ setView }: { setView: (view: string) => void }) {
+function MarketingNav({ setView }: { setView: (view: string) => void }) {
   return (
-    <main className="site-shell">
+    <>
+      <a className="announce" onClick={() => setView("product")}>AgentShield now protects live agent tool calls. See the production blueprint <ArrowRight size={15} /></a>
       <header className="site-nav">
         <button className="brand-button" onClick={() => setView("home")}><Shield size={24} /> AgentShield</button>
         <nav>
-          <a href="#product">Product</a>
-          <a href="#security">Security</a>
-          <a href="#ledger">Ledger</a>
+          <a onClick={() => setView("product")}>Product</a>
+          <a onClick={() => setView("security")}>Security</a>
+          <a onClick={() => setView("how")}>How to use</a>
+          <a onClick={() => setView("docs")}>Docs</a>
+          <a onClick={() => setView("pricing")}>Pricing</a>
         </nav>
         <div className="nav-actions">
           <button className="ghost-link" onClick={() => setView("login")}>Sign in</button>
-          <button className="small-primary" onClick={() => setView("signup")}>Start free</button>
+          <button className="small-primary" onClick={() => setView("signup")}>Get started</button>
         </div>
       </header>
+    </>
+  );
+}
+
+function MarketingSite({ setView }: { setView: (view: string) => void }) {
+  return (
+    <main className="site-shell page-fade">
+      <MarketingNav setView={setView} />
 
       <section className="hero">
         <div className="hero-copy">
-          <span className="section-kicker"><Radar size={15} /> Runtime security for agentic systems</span>
-          <h1>Secure every agent interaction</h1>
-          <p>AgentShield protects AI agents across identity, permissions, and actions so teams can build, ship, and scale autonomous systems with confidence.</p>
+          <h1>A dedicated security guide for every agent</h1>
+          <p>AgentShield watches every agent message, identity claim, and tool call so autonomous systems can move quickly without losing control.</p>
           <div className="hero-actions">
-            <button onClick={() => setView("app")}>Open dashboard <ArrowRight size={17} /></button>
-            <button className="secondary" onClick={() => setView("attack")}>Run attack sim <ArrowRight size={17} /></button>
+            <button onClick={() => setView("app")}><Shield size={18} /> See live console</button>
+            <button className="secondary" onClick={() => setView("how")}>How it works <ArrowRight size={17} /></button>
           </div>
         </div>
-        <div className="hero-visual">
+        <div className="wave-stage">
+          <div className="wave wave-blue" />
+          <div className="wave wave-gold" />
           <AgentNetworkScene />
           {trustNodes.map((node) => <span className={`orbit-label ${node.className}`} key={node.label}>{node.label}</span>)}
           <div className="network-status">
-            <span><i /> Live network</span>
-            <strong>Risk posture <b>Low</b></strong>
+            <span><i /> Live guard path</span>
+            <strong>Ledger verified <b>online</b></strong>
           </div>
         </div>
       </section>
@@ -373,6 +404,84 @@ function MarketingSite({ setView }: { setView: (view: string) => void }) {
           <strong>BLOCKED</strong>
           <span>POLICY_ACTION_DENIED · ledger #1026</span>
         </div>
+      </section>
+    </main>
+  );
+}
+
+function InfoPage({ setView, kind }: { setView: (view: string) => void; kind: "product" | "security" | "how" | "docs" | "pricing" }) {
+  const config = {
+    product: {
+      icon: <Layers size={28} />,
+      title: "Deploy a security guide across every agent journey",
+      body: "AgentShield gives teams one runtime layer for identity, policy, detection, auditability, and operator visibility.",
+      rows: [
+        ["Message guard", "Classify prompt injection attempts before they reach the agent runtime."],
+        ["Tool-call guard", "Block unsafe actions when they exceed the agent permission manifest."],
+        ["Trust console", "Monitor live agents, risk changes, ledger state, and blocked events."],
+      ],
+    },
+    security: {
+      icon: <Fingerprint size={28} />,
+      title: "Security controls designed for autonomous systems",
+      body: "The synchronous path stays deterministic: authenticate, verify identity, check policy, classify obvious injection, and write the audit ledger.",
+      rows: [
+        ["API key + JWT", "Tenant/client access is separate from cryptographic agent identity."],
+        ["Append-only ledger", "Hash-chained records prove what happened and where tampering begins."],
+        ["Fail closed", "If identity, policy, or ledger write fails, the protected action does not proceed."],
+      ],
+    },
+    how: {
+      icon: <Workflow size={28} />,
+      title: "How to use AgentShield",
+      body: "Add AgentShield before each agent message and before each tool execution. The SDK returns a verdict, evidence, trust delta, and ledger id.",
+      rows: [
+        ["1. Spawn agent", "Create a protected agent and receive a short-lived RS256 token."],
+        ["2. Analyze messages", "Call /v1/shield/analyze before the agent processes user or retrieved content."],
+        ["3. Check tools", "Call /v1/shield/tool-call before executing web, file, database, or API tools."],
+      ],
+    },
+    docs: {
+      icon: <BookOpen size={28} />,
+      title: "Developer docs and production contracts",
+      body: "The repo includes OpenAPI output, Python SDK methods, SQL schema draft, and a full documentation pack for future agents or engineers.",
+      rows: [
+        ["OpenAPI", "backend/openapi.json contains the current REST contract."],
+        ["SDK", "sdk/python/agentshield wraps agents, shield checks, ledger verification, threats, and simulations."],
+        ["Runbook", "AgentShield_Production_Documentation_Pack contains implementation, security, and acceptance plans."],
+      ],
+    },
+    pricing: {
+      icon: <Plug size={28} />,
+      title: "Simple plans for teams moving agents into production",
+      body: "The current prototype is ready for local evaluation. Production pricing should map to protected decisions, retained ledger entries, and team workspaces.",
+      rows: [
+        ["Prototype", "Local dashboard, security API, SDK, attack simulation, and documentation pack."],
+        ["Team", "Persistent storage, team auth, audit retention, and deployment monitoring."],
+        ["Enterprise", "SSO, custom retention, external hash anchoring, and dedicated deployment controls."],
+      ],
+    },
+  }[kind];
+  return (
+    <main className="site-shell page-fade">
+      <MarketingNav setView={setView} />
+      <section className="info-hero">
+        <div className="info-icon">{config.icon}</div>
+        <h1>{config.title}</h1>
+        <p>{config.body}</p>
+      </section>
+      <section className="journey-list">
+        {config.rows.map(([title, body], index) => (
+          <article key={title}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </article>
+        ))}
+      </section>
+      <section className="cta-band">
+        <h2>Give every agent a security handhold.</h2>
+        <button onClick={() => setView("app")}>Open live console <ArrowRight size={17} /></button>
       </section>
     </main>
   );
@@ -570,6 +679,9 @@ function App() {
   if (view === "ledger") return <LedgerPage setView={setView} data={agentShield.data} verifyLedger={agentShield.verifyLedger} />;
   if (view === "attack") return <AttackSimPage setView={setView} runAttack={agentShield.runAttack} />;
   if (view === "agents") return <AgentsPage setView={setView} data={agentShield.data} revokeAgent={agentShield.revokeAgent} />;
+  if (view === "product" || view === "security" || view === "how" || view === "docs" || view === "pricing") {
+    return <InfoPage setView={setView} kind={view as "product" | "security" | "how" | "docs" | "pricing"} />;
+  }
   return <MarketingSite setView={setView} />;
 }
 

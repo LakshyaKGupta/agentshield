@@ -131,6 +131,26 @@ class ThreatPage(BaseModel):
     threats: list[ThreatEvent]
 
 
+class HealthResponse(BaseModel):
+    status: Literal["ok"]
+    service: str
+    version: str
+    demo_mode: bool
+    demo_api_key: str | None = None
+
+
+class ReadinessResponse(BaseModel):
+    ready: bool
+    service: str
+    version: str
+    store: Literal["in_memory"]
+    ledger_valid: bool
+    ledger_entries: int
+    tenant_count: int
+    agent_count: int
+    event_count: int
+
+
 class AttackSimulationRequest(BaseModel):
     attack_type: str = "instruction_override"
     payload: str | None = None

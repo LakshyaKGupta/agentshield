@@ -113,6 +113,46 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HealthResponse": {
+        "properties": {
+          "demo_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demo Api Key"
+          },
+          "demo_mode": {
+            "title": "Demo Mode",
+            "type": "boolean"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "demo_mode"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
       "PermissionManifest": {
         "properties": {
           "default_action": {
@@ -149,6 +189,60 @@
           }
         },
         "title": "PermissionManifest",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "agent_count": {
+            "title": "Agent Count",
+            "type": "integer"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "ledger_entries": {
+            "title": "Ledger Entries",
+            "type": "integer"
+          },
+          "ledger_valid": {
+            "title": "Ledger Valid",
+            "type": "boolean"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "store": {
+            "const": "in_memory",
+            "title": "Store",
+            "type": "string"
+          },
+          "tenant_count": {
+            "title": "Tenant Count",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "service",
+          "version",
+          "store",
+          "ledger_valid",
+          "ledger_entries",
+          "tenant_count",
+          "agent_count",
+          "event_count"
+        ],
+        "title": "ReadinessResponse",
         "type": "object"
       },
       "ToolCallRequest": {
@@ -243,13 +337,33 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Health"
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready"
       }
     },
     "/v1/agents": {

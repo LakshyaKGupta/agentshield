@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from .contracts import AgentCreateRequest, AnalyzeRequest, AttackSimulationRequest, ThreatPage, ToolCallRequest
+from .contracts import AgentCreateRequest, AnalyzeRequest, AttackSimulationRequest, HealthResponse, ReadinessResponse, ThreatPage, ToolCallRequest
 from .ledger.service import verify_ledger
 from .security.api_keys import authenticate_api_key, create_api_key
 from .security.jwt_identity import generate_dev_keypair
@@ -13,18 +15,44 @@ from .services import analyze_message, check_tool_call, list_agents, revoke_agen
 from .settings import get_settings
 from .store import store
 
-app = FastAPI(title="AgentShield API", version="0.1.0")
+settings = get_settings()
+
+app = FastAPI(title="AgentShield API", version=settings.app_version)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+    allow_origins=list(settings.allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-settings = get_settings()
 tenant = store.seed_tenant()
 private_key, public_key = generate_dev_keypair()
 demo_api_key = create_api_key(store, settings, tenant.id)
+
+
+def error_response(status_code: int, code: str, message: str, details: object | None = None) -> JSONResponse:
+    body = {"error": {"code": code, "message": message}}
+    if details is not None:
+        body["error"]["details"] = details
+    return JSONResponse(status_code=status_code, content=body)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail
+    code = "HTTP_ERROR"
+    message = "Request failed."
+    if isinstance(detail, dict):
+        code = str(detail.get("code", code))
+        message = str(detail.get("message", code))
+    elif isinstance(detail, str):
+        message = detail
+    return error_response(exc.status_code, code, message)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return error_response(422, "VALIDATION_ERROR", "Request validation failed.", exc.errors())
 
 
 def require_api_key(x_agentshield_api_key: str | None = Header(default=None, alias="X-AgentShield-API-Key")):
@@ -34,9 +62,31 @@ def require_api_key(x_agentshield_api_key: str | None = Header(default=None, ali
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health():
-    return {"status": "ok", "service": "agentshield", "demo_api_key": demo_api_key}
+    return {
+        "status": "ok",
+        "service": "agentshield",
+        "version": settings.app_version,
+        "demo_mode": settings.demo_mode,
+        "demo_api_key": demo_api_key if settings.demo_mode else None,
+    }
+
+
+@app.get("/ready", response_model=ReadinessResponse)
+def ready():
+    ledger_status = verify_ledger(store)
+    return {
+        "ready": ledger_status.valid,
+        "service": "agentshield",
+        "version": settings.app_version,
+        "store": "in_memory",
+        "ledger_valid": ledger_status.valid,
+        "ledger_entries": ledger_status.entries_checked,
+        "tenant_count": len(store.tenants),
+        "agent_count": len(store.agents),
+        "event_count": len(store.events),
+    }
 
 
 @app.post("/v1/agents")

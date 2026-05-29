@@ -3,6 +3,51 @@
 ## Session Update - 2026-05-29
 
 ### Objective
+- Refresh AgentShield to follow the Handhold-inspired light hero direction, add multi-page navigation, and harden local backend/frontend reliability.
+
+### Completed
+- Reworked the public site around a white/cream, black-type, blue/gold ribbon visual system inspired by `handhold.io`.
+- Added public nav routes for Product, Security, How to use, Docs, and Pricing.
+- Kept login/signup flows and connected dashboard pages intact.
+- Added frontend API request timeouts and clearer backend error handling for unavailable or failing API calls.
+- Added backend production-readiness improvements:
+  - `APP_VERSION`, `ALLOWED_ORIGINS`, and `DEMO_MODE` settings.
+  - Environment-driven CORS with local Vite fallback ports `5173`, `5174`, and `5175`.
+  - `GET /ready` readiness endpoint with ledger validity and store counts.
+  - Consistent JSON error envelope for HTTP and validation errors.
+- Regenerated `backend/openapi.json`.
+
+### Files Modified
+- `README.md`
+- `backend/.env.example`
+- `backend/app/contracts.py`
+- `backend/app/main.py`
+- `backend/app/settings.py`
+- `backend/openapi.json`
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `HANDOFF.md`
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed 7 tests.
+- `npm run build` passed. Vite still reports the known Three.js chunk-size warning.
+- `python3 scripts/export_openapi.py` regenerated OpenAPI successfully.
+- Browser verification against backend on `127.0.0.1:8000` and Vite on `127.0.0.1:5175` passed:
+  - Landing page renders with no console warnings/errors.
+  - Product, Security, How to use, Docs, and Pricing nav pages render without horizontal overflow.
+  - Dashboard loaded real backend data: 5 protected decisions, 1 threat, valid ledger, 5 recent events.
+  - WebGL canvas nonblank check passed.
+  - Mobile 390 px landing page has no horizontal overflow.
+- `curl http://127.0.0.1:8000/ready` returned `ready: true` with ledger validity.
+
+### Pending Work
+- Replace in-memory store with PostgreSQL repositories and Alembic migrations.
+- Replace demo API-key bootstrap with real workspace auth before shared deployment.
+- Code-split Three.js to remove the Vite chunk-size warning.
+
+## Session Update - 2026-05-29
+
+### Objective
 - Replace frontend sample data with real backend API data and prepare for private GitHub upload.
 
 ### Completed
