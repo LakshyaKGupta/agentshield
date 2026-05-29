@@ -10,6 +10,8 @@ from backend.app.services import analyze_message, check_tool_call, list_agents, 
 from backend.app.settings import get_settings
 from backend.app.store import InMemoryStore
 from backend.app.contracts import AttackSimulationRequest
+from backend.app.services import login_workspace, signup_workspace
+from backend.app.contracts import WorkspaceLoginRequest, WorkspaceSignupRequest
 
 
 class SecurityCoreTests(unittest.TestCase):
@@ -104,6 +106,21 @@ class SecurityCoreTests(unittest.TestCase):
         revoked = revoke_agent(self.store, self.settings, self.tenant.id, self.agent.agent_id, self.private_key)
         self.assertEqual(revoked.status, "revoked")
         self.assertEqual(revoked.token, "")
+
+    def test_workspace_signup_and_login_issue_api_keys(self) -> None:
+        signup = signup_workspace(
+            self.store,
+            self.settings,
+            WorkspaceSignupRequest(email="ops@example.com", password="correct-horse", workspace_name="Ops"),
+        )
+        self.assertTrue(signup.api_key.startswith("as_live_"))
+        login = login_workspace(
+            self.store,
+            self.settings,
+            WorkspaceLoginRequest(email="ops@example.com", password="correct-horse"),
+        )
+        self.assertEqual(login.email, "ops@example.com")
+        authenticate_api_key(self.store, self.settings, login.api_key, "shield:write")
 
 
 if __name__ == "__main__":

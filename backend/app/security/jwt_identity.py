@@ -63,7 +63,9 @@ def issue_agent_token(
     private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
     signature = private_key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
     token = f"{signing_input}.{_b64url(signature)}"
-    store.tokens[jti] = TokenRecord(jti=jti, tenant_id=tenant_id, agent_id=agent_id, expires_at=exp)
+    record = TokenRecord(jti=jti, tenant_id=tenant_id, agent_id=agent_id, expires_at=exp)
+    store.tokens[jti] = record
+    store.persist_token(record)
     return token, exp, jti
 
 
@@ -96,4 +98,3 @@ def verify_agent_token(store: InMemoryStore, settings: Settings, token: str | No
     if not agent or agent.status != "active":
         raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
     return payload
-

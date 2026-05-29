@@ -7,15 +7,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .contracts import AgentCreateRequest, AnalyzeRequest, AttackSimulationRequest, HealthResponse, ReadinessResponse, ThreatPage, ToolCallRequest
+from .contracts import AgentCreateRequest, AnalyzeRequest, AttackSimulationRequest, HealthResponse, ReadinessResponse, ThreatPage, ToolCallRequest, WorkspaceLoginRequest, WorkspaceSignupRequest
 from .ledger.service import verify_ledger
 from .security.api_keys import authenticate_api_key, create_api_key
 from .security.jwt_identity import generate_dev_keypair
-from .services import analyze_message, check_tool_call, list_agents, revoke_agent, run_attack_simulation, spawn_agent
+from .services import analyze_message, check_tool_call, list_agents, login_workspace, revoke_agent, run_attack_simulation, signup_workspace, spawn_agent
 from .settings import get_settings
-from .store import store
+from .store import create_store
 
 settings = get_settings()
+store = create_store(settings.database_url)
 
 app = FastAPI(title="AgentShield API", version=settings.app_version)
 app.add_middleware(
@@ -80,13 +81,29 @@ def ready():
         "ready": ledger_status.valid,
         "service": "agentshield",
         "version": settings.app_version,
-        "store": "in_memory",
+        "store": store.backend_name,
         "ledger_valid": ledger_status.valid,
         "ledger_entries": ledger_status.entries_checked,
         "tenant_count": len(store.tenants),
         "agent_count": len(store.agents),
         "event_count": len(store.events),
     }
+
+
+@app.post("/v1/auth/signup")
+def signup(request: WorkspaceSignupRequest):
+    try:
+        return signup_workspace(store, settings, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc), "message": "A workspace user with this email already exists."}) from exc
+
+
+@app.post("/v1/auth/login")
+def login(request: WorkspaceLoginRequest):
+    try:
+        return login_workspace(store, settings, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail={"code": str(exc), "message": "Invalid email or password."}) from exc
 
 
 @app.post("/v1/agents")

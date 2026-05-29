@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import hmac
+import secrets
 from time import perf_counter
 
 from .contracts import (
@@ -16,14 +19,61 @@ from .contracts import (
     ThreatLevel,
     ToolCallRequest,
     Verdict,
+    WorkspaceAuthResponse,
+    WorkspaceLoginRequest,
+    WorkspaceSignupRequest,
 )
 from .ledger.service import append_ledger_entry
 from .security.injection import detect_injection
 from .security.jwt_identity import issue_agent_token, verify_agent_token
 from .security.permissions import check_tool_permission
 from .settings import Settings
-from .store import AgentRecord, InMemoryStore
+from .store import AgentRecord, InMemoryStore, Tenant, WorkspaceUser
 from uuid import uuid4
+from .security.api_keys import create_api_key
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
+    return f"pbkdf2_sha256${salt}${digest}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        _, salt, digest = stored_hash.split("$", 2)
+    except ValueError:
+        return False
+    candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
+    return hmac.compare_digest(candidate, digest)
+
+
+def signup_workspace(store: InMemoryStore, settings: Settings, request: WorkspaceSignupRequest) -> WorkspaceAuthResponse:
+    email = _normalize_email(request.email)
+    if email in store.users:
+        raise ValueError("AUTH_EMAIL_EXISTS")
+    tenant = Tenant(id=uuid4(), name=request.workspace_name, status="active")
+    store.tenants[tenant.id] = tenant
+    store.persist_tenant(tenant)
+    user = WorkspaceUser(id=uuid4(), tenant_id=tenant.id, email=email, password_hash=_hash_password(request.password))
+    store.users[email] = user
+    store.persist_user(user)
+    api_key = create_api_key(store, settings, tenant.id)
+    return WorkspaceAuthResponse(tenant_id=tenant.id, workspace_name=tenant.name, email=email, api_key=api_key)
+
+
+def login_workspace(store: InMemoryStore, settings: Settings, request: WorkspaceLoginRequest) -> WorkspaceAuthResponse:
+    email = _normalize_email(request.email)
+    user = store.users.get(email)
+    if user is None or not _verify_password(request.password, user.password_hash):
+        raise PermissionError("AUTH_LOGIN_INVALID")
+    tenant = store.tenants[user.tenant_id]
+    api_key = create_api_key(store, settings, tenant.id)
+    return WorkspaceAuthResponse(tenant_id=tenant.id, workspace_name=tenant.name, email=email, api_key=api_key)
 
 
 def _trust_delta(verdict: Verdict, evidence: list[Evidence]) -> float:
@@ -51,6 +101,7 @@ def spawn_agent(store: InMemoryStore, settings: Settings, request: AgentCreateRe
         metadata=request.metadata,
     )
     store.agents[agent.id] = agent
+    store.persist_agent(agent)
     token, expires_at, _ = issue_agent_token(store, settings, tenant_id, agent.id, private_key_pem)
     append_ledger_entry(
         store,
@@ -106,6 +157,8 @@ def revoke_agent(store: InMemoryStore, settings: Settings, tenant_id, agent_id, 
     for token in store.tokens.values():
         if token.agent_id == agent_id:
             token.revoked_at = datetime.now(timezone.utc)
+            store.persist_token(token)
+    store.persist_agent(agent)
     append_ledger_entry(
         store,
         tenant_id=tenant_id,
@@ -146,20 +199,23 @@ def analyze_message(
             "message_length": len(request.message),
         },
     )
-    store.trust_history.append({"agent_id": agent.id, "delta": delta, "score_after": trust_score, "created_at": datetime.now(timezone.utc)})
+    store.persist_agent(agent)
+    trust = {"agent_id": agent.id, "ledger_id": entry.id, "delta": delta, "reason": "message_verdict", "score_after": trust_score, "created_at": datetime.now(timezone.utc)}
+    store.trust_history.append(trust)
+    store.persist_trust_history(trust)
     if detection.verdict != Verdict.ALLOWED:
-        store.threat_events.append(
-            {
-                "id": uuid4(),
-                "ledger_id": entry.id,
-                "agent_id": agent.id,
-                "attack_type": detection.evidence[0].code.lower() if detection.evidence else "unknown",
-                "confidence": max((e.confidence or 0 for e in detection.evidence), default=0),
-                "evidence": detection.evidence[0].message if detection.evidence else "Suspicious message.",
-                "resolved": False,
-                "created_at": datetime.now(timezone.utc),
-            }
-        )
+        threat = {
+            "id": uuid4(),
+            "ledger_id": entry.id,
+            "agent_id": agent.id,
+            "attack_type": detection.evidence[0].code.lower() if detection.evidence else "unknown",
+            "confidence": max((e.confidence or 0 for e in detection.evidence), default=0),
+            "evidence": detection.evidence[0].message if detection.evidence else "Suspicious message.",
+            "resolved": False,
+            "created_at": datetime.now(timezone.utc),
+        }
+        store.threat_events.append(threat)
+        store.persist_threat_event(threat)
     return SecurityVerdict(
         allowed=detection.verdict == Verdict.ALLOWED,
         verdict=detection.verdict,
@@ -204,20 +260,23 @@ def check_tool_call(
             "evidence": [e.model_dump() for e in evidence_list],
         },
     )
-    store.trust_history.append({"agent_id": agent.id, "delta": delta, "score_after": trust_score, "created_at": datetime.now(timezone.utc)})
+    store.persist_agent(agent)
+    trust = {"agent_id": agent.id, "ledger_id": entry.id, "delta": delta, "reason": "tool_call_verdict", "score_after": trust_score, "created_at": datetime.now(timezone.utc)}
+    store.trust_history.append(trust)
+    store.persist_trust_history(trust)
     if not allowed:
-        store.threat_events.append(
-            {
-                "id": uuid4(),
-                "ledger_id": entry.id,
-                "agent_id": agent.id,
-                "attack_type": "unauthorized_tool_call",
-                "confidence": 1.0,
-                "evidence": evidence_list[0].message if evidence_list else "Unauthorized tool call.",
-                "resolved": False,
-                "created_at": datetime.now(timezone.utc),
-            }
-        )
+        threat = {
+            "id": uuid4(),
+            "ledger_id": entry.id,
+            "agent_id": agent.id,
+            "attack_type": "unauthorized_tool_call",
+            "confidence": 1.0,
+            "evidence": evidence_list[0].message if evidence_list else "Unauthorized tool call.",
+            "resolved": False,
+            "created_at": datetime.now(timezone.utc),
+        }
+        store.threat_events.append(threat)
+        store.persist_threat_event(threat)
     return SecurityVerdict(
         allowed=allowed,
         verdict=verdict,

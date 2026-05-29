@@ -17,12 +17,14 @@ def hash_api_key(raw_key: str, pepper: str) -> str:
 def create_api_key(store: InMemoryStore, settings: Settings, tenant_id: UUID, scopes: list[str] | None = None) -> str:
     raw_key = "as_live_" + secrets.token_urlsafe(32)
     token_hash = hash_api_key(raw_key, settings.api_key_pepper)
-    store.api_keys[token_hash] = ApiKeyRecord(
+    record = ApiKeyRecord(
         id=uuid4(),
         tenant_id=tenant_id,
         token_hash=token_hash,
         scopes=scopes or ["agents:write", "shield:write", "ledger:read", "threats:read"],
     )
+    store.api_keys[token_hash] = record
+    store.persist_api_key(record)
     return raw_key
 
 
@@ -36,5 +38,5 @@ def authenticate_api_key(store: InMemoryStore, settings: Settings, raw_key: str 
     if required_scope not in record.scopes:
         raise PermissionError("AUTH_API_KEY_INVALID")
     record.last_used_at = datetime.now(timezone.utc)
+    store.persist_api_key(record)
     return record
-

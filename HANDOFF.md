@@ -3,6 +3,76 @@
 ## Session Update - 2026-05-29
 
 ### Objective
+- Finish the remaining production-hardening slice: PostgreSQL persistence, real workspace auth, Three.js code splitting, add-agent workflow, and updated multi-page frontend animation/chat behavior.
+
+### Completed
+- Added optional PostgreSQL persistence:
+  - `DATABASE_URL` now enables a `PostgresStore`.
+  - Store writes persist tenants, workspace users, API keys, agents, tokens, ledger entries, threat events, trust history, and outbox events.
+  - Migration is now idempotent and includes `workspace_users`, `agent_tokens`, `agents.permissions`, and append-only audit ledger triggers.
+- Added real workspace auth:
+  - `POST /v1/auth/signup`
+  - `POST /v1/auth/login`
+  - Frontend auth forms now call the backend and store the issued workspace API key in local storage.
+  - Frontend no longer relies on `/health.demo_api_key` for normal access.
+- Added an AI-agent creation workflow:
+  - Agents page includes an “Add AI agent” form for name, type, allowed tool, and allowed action.
+  - README includes a curl example showing how to create a workspace and add an AI agent.
+- Code-split the Three.js hero:
+  - Moved the scene to `frontend/src/AgentNetworkScene.tsx`.
+  - Main frontend chunk dropped to ~221 kB and the Three.js scene is now a lazy chunk.
+- Frontend UX changes:
+  - Removed the announcement line “AgentShield now protects live agent tool calls. See the production blueprint”.
+  - Added a bottom chat-style prompt inspired by the reference site.
+  - Kept 3D animation to the hero only.
+  - Added lightweight animated rails/reveal motion to non-hero pages.
+  - Kept Product, Security, How to use, Docs, and Pricing as distinct single-page routes.
+
+### Files Modified
+- `README.md`
+- `backend/.env.example`
+- `backend/app/contracts.py`
+- `backend/app/ledger/service.py`
+- `backend/app/main.py`
+- `backend/app/security/api_keys.py`
+- `backend/app/security/jwt_identity.py`
+- `backend/app/services.py`
+- `backend/app/settings.py`
+- `backend/app/store.py`
+- `backend/migrations/001_initial_schema.sql`
+- `backend/openapi.json`
+- `frontend/src/AgentNetworkScene.tsx`
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `pyproject.toml`
+- `tests/test_security_core.py`
+- `HANDOFF.md`
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed 8 tests.
+- `python3 scripts/export_openapi.py` regenerated OpenAPI successfully.
+- `npm run build` passed with no chunk-size warning:
+  - main JS: ~221 kB
+  - lazy Three.js scene chunk: ~497 kB
+- Browser QA on `http://127.0.0.1:5175` with backend on `127.0.0.1:8000` passed:
+  - Home page has no announcement line.
+  - Home page has one canvas, only in the hero.
+  - Product, Security, How to use, Docs, and Pricing each render with page motion and no horizontal overflow.
+  - Signup flow creates a workspace through the backend.
+  - Add AI agent creates a protected `ResearchAgent` through `POST /v1/agents`.
+  - Agent dashboard route has zero canvases outside hero and no horizontal overflow.
+  - Mobile 390 px landing page has no horizontal overflow.
+- `curl http://127.0.0.1:8000/ready` returned `ready: true`.
+- Curl signup smoke returned a real `as_live_...` API key.
+
+### Pending Work
+- Run against a real PostgreSQL service in CI/deployment and add migration tooling around the idempotent SQL.
+- Replace local-storage API-key handling with cookie/session-backed auth before public multi-user deployment.
+- Add password reset, email verification, and SSO if this becomes a real hosted product.
+
+## Session Update - 2026-05-29
+
+### Objective
 - Refresh AgentShield to follow the Handhold-inspired light hero direction, add multi-page navigation, and harden local backend/frontend reliability.
 
 ### Completed

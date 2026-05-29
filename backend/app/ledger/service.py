@@ -51,7 +51,10 @@ def append_ledger_entry(
         created_at=created_at,
     )
     store.ledger.append(entry)
-    store.events.append({"event": "security.event.created", "ledger_id": entry.id, "agent_id": str(agent_id), "verdict": verdict.value})
+    store.persist_ledger_entry(entry)
+    event = {"event": "security.event.created", "ledger_id": entry.id, "agent_id": str(agent_id), "verdict": verdict.value}
+    store.events.append(event)
+    store.persist_event(event)
     return entry
 
 
@@ -79,4 +82,3 @@ def verify_ledger(store: InMemoryStore) -> LedgerVerification:
             )
         prev_hash = entry.curr_hash
     return LedgerVerification(valid=True, entries_checked=len(store.ledger), checked_at=datetime.now(timezone.utc))
-

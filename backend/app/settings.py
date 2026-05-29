@@ -13,6 +13,7 @@ class Settings:
     jwt_audience: str = "agentshield-agents"
     jwt_private_key_pem: str | None = None
     jwt_public_key_pem: str | None = None
+    database_url: str | None = None
     allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://localhost:5174",
@@ -40,6 +41,7 @@ def get_settings() -> Settings:
         jwt_audience=os.getenv("JWT_AUDIENCE", "agentshield-agents"),
         jwt_private_key_pem=os.getenv("JWT_PRIVATE_KEY"),
         jwt_public_key_pem=os.getenv("JWT_PUBLIC_KEY"),
+        database_url=os.getenv("DATABASE_URL"),
         allowed_origins=allowed_origins,
         demo_mode=os.getenv("DEMO_MODE", "true").lower() in {"1", "true", "yes", "on"},
     )

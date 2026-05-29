@@ -65,6 +65,24 @@ class AgentListResponse(BaseModel):
     agents: list[AgentResponse]
 
 
+class WorkspaceSignupRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=180)
+    password: str = Field(min_length=8, max_length=200)
+    workspace_name: str = Field(min_length=1, max_length=120)
+
+
+class WorkspaceLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=180)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class WorkspaceAuthResponse(BaseModel):
+    tenant_id: UUID
+    workspace_name: str
+    email: str
+    api_key: str
+
+
 class AnalyzeRequest(BaseModel):
     agent_id: UUID
     direction: Literal["inbound", "outbound", "inter_agent"]
@@ -143,7 +161,7 @@ class ReadinessResponse(BaseModel):
     ready: bool
     service: str
     version: str
-    store: Literal["in_memory"]
+    store: Literal["in_memory", "postgres"]
     ledger_valid: bool
     ledger_entries: int
     tenant_count: int
