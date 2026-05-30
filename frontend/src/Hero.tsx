@@ -52,7 +52,7 @@ const FLOAT_ICONS: FloatIcon[] = [
 const LOGOS = ["Acme AI","NeuralOps","FlowLabs","Axiom","Synthex","DataMesh","CoreAI","PulseML","Vertex","Echo AI"];
 
 /* ─── HERO ──────────────────────────────────────────── */
-export default function Hero({ setView }: { setView: (v: string) => void }) {
+export default function Hero({ setView, authenticated = false }: { setView: (v: string) => void; authenticated?: boolean }) {
   return (
     <section style={{
       position: "relative",
@@ -149,7 +149,7 @@ export default function Hero({ setView }: { setView: (v: string) => void }) {
           display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center",
         }}>
           <button
-            onClick={() => setView("signup")}
+            onClick={() => setView(authenticated ? "app" : "signup")}
             onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, { opacity: ".82", transform: "translateY(-2px)" })}
             onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, { opacity: "1", transform: "translateY(0)" })}
             style={{
@@ -161,7 +161,7 @@ export default function Hero({ setView }: { setView: (v: string) => void }) {
               boxShadow: "0 4px 14px rgba(17,17,17,.2)",
               cursor: "none", transition: "all 200ms ease",
             }}>
-            Create workspace →
+            {authenticated ? "Go to Console →" : "Create workspace →"}
           </button>
 
           <button

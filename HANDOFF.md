@@ -1,14 +1,20 @@
 # Agent Eval Handoff
 
-## Session Update - 2026-05-30 (Night Session: Resilient Firebase Auth Fallback & Pristine Workspace Onboarding)
+## Session Update - 2026-05-30 (Night Session: Resilient Firebase Auth Fallback, Onboarding checklists & Auth-Aware Marketing)
 
 ### Objective
 - Resolve the Firebase token verification issue caused by missing Application Default Credentials (ADC) in local development environments.
 - Provide a resilient fallback to unverified decoding under demo mode or missing credentials to prevent app crashes and facilitate seamless local testing.
 - Remove "How It Works" from the authenticated dashboard sidebar.
 - Build a beautiful, interactive, and actionable onboarding/checklist guide for new tenants with pristine workspaces (0 agents/logs) so the screen is never left completely blank, providing clear CTAs instead of forcing users to start from zero.
+- Persist the login/auth session data in `localStorage` across page loads and display user auth status dynamically across the public website/hero section (updating navigation links and CTA buttons from signup to console).
 
 ### Completed
+- **Persistent Auth-Aware Marketing homepage**:
+  - Wired `Marketing`, `Nav`, `Hero`, `PricingSection`, and `CTAFooter` to be aware of the active authenticated state by checking the `apiKey` stored in `localStorage`.
+  - When the user is logged in, the main Navigation header dynamically swaps "Sign in" and "Get started" with "Console" and "Sign out" links.
+  - The main Hero section CTA dynamically updates from "Create workspace →" to **"Go to Console →"** (which immediately routes them to the dashboard).
+  - The Pricing tier and Footer CTA sections adapt to logged-in users, directly linking them to their Console instead of prompting them to sign up again.
 - **Resilient Firebase Auth Fallback**:
   - Enhanced `verify_firebase_id_token` in `backend/app/security/firebase_auth.py` to seamlessly catch signature verification errors (including `DefaultCredentialsError` or connection timeouts).
   - Wired `firebase_auth.py` to check `get_settings().demo_mode` and robustly fall back to unverified decoding for local sandbox evaluations when in demo mode or when GCP credentials are not set.
@@ -25,7 +31,8 @@
 
 ### Files Modified
 - `backend/app/security/firebase_auth.py` (Robust signature exception handling & demo-mode aware unverified JWT claims decode fallback)
-- `frontend/src/main.tsx` (Removed Sidebar "How It Works", added premium interactive empty-state onboarding, setup checklists, and actionable CTAs)
+- `frontend/src/main.tsx` (Removed Sidebar "How It Works", added premium interactive empty-state onboarding, setup checklists, and auth-aware header navigation, pricing, footer elements)
+- `frontend/src/Hero.tsx` (Dynamic auth-aware CTA button adaptive updates)
 - `HANDOFF.md` (Updated documentation pack)
 
 ---

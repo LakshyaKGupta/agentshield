@@ -168,7 +168,7 @@ function ShieldLogo({ size = 22 }: { size?: number }) {
 }
 
 /* ═══════════════════════════ NAV ════════════════════════════════ */
-function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?: boolean }) {
+function Nav({ setView, solid = false, authenticated = false, onLogout }: { setView: (v: string) => void; solid?: boolean; authenticated?: boolean; onLogout?: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive]     = useState("");
   const navRef = useRef<HTMLElement>(null);
@@ -247,8 +247,17 @@ function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?:
         </nav>
         {/* Auth — always far right */}
         <div className="nav__right">
-          <button className="nav__signin" onClick={() => setView("login")}>Sign in</button>
-          <button className="nav__cta" onClick={() => setView("signup")}>Get started</button>
+          {authenticated ? (
+            <>
+              <button className="nav__signin" onClick={() => setView("app")}>Console</button>
+              <button className="nav__cta" onClick={onLogout}>Sign out</button>
+            </>
+          ) : (
+            <>
+              <button className="nav__signin" onClick={() => setView("login")}>Sign in</button>
+              <button className="nav__cta" onClick={() => setView("signup")}>Get started</button>
+            </>
+          )}
         </div>
       </div>
     </header>
@@ -577,7 +586,7 @@ const PLANS = [
   { tier:"Enterprise", price:"Custom", desc:"SSO, custom retention and dedicated support.", features:["Everything in Team","SSO / SAML","Custom retention","Hash anchoring","Dedicated support"], cta:"Contact us", featured:false },
 ];
 
-function PricingSection({ setView }: { setView: (v: string) => void }) {
+function PricingSection({ setView, authenticated = false }: { setView: (v: string) => void; authenticated?: boolean }) {
   return (
     <section className="section section--alt" id="pricing">
       <div className="section__inner">
@@ -612,10 +621,10 @@ function PricingSection({ setView }: { setView: (v: string) => void }) {
                 </ul>
                 <button
                   className={p.featured ? "btn-primary" : "btn-ghost"}
-                  onClick={() => setView("signup")}
+                  onClick={() => setView(authenticated ? "app" : "signup")}
                   style={{ width: "100%" }}
                 >
-                  {p.cta}
+                  {authenticated ? "Go to Console" : p.cta}
                 </button>
               </div>
             </FadeUp>
@@ -627,7 +636,7 @@ function PricingSection({ setView }: { setView: (v: string) => void }) {
 }
 
 /* ═══════════════════════════ SECTION 5: CTA + FOOTER ═══════════ */
-function CTAFooter({ setView }: { setView: (v: string) => void }) {
+function CTAFooter({ setView, authenticated = false }: { setView: (v: string) => void; authenticated?: boolean }) {
   const scrollTo = (id: string) => {
     setView("home");
     setTimeout(() => {
@@ -643,10 +652,18 @@ function CTAFooter({ setView }: { setView: (v: string) => void }) {
           <h2>Give every agent<br/>a security handhold.</h2>
           <p>Start protecting agent messages, tool calls, and handoffs in minutes — free forever for local evaluation.</p>
           <div className="cta-btns">
-            <button className="btn-primary btn-lg" onClick={() => setView("signup")}>
-              <ShieldLogo size={16} /> Create workspace
-            </button>
-            <button className="btn-ghost" onClick={() => setView("login")}>Sign in</button>
+            {authenticated ? (
+              <button className="btn-primary btn-lg" onClick={() => setView("app")}>
+                <ShieldLogo size={16} /> Go to Console
+              </button>
+            ) : (
+              <>
+                <button className="btn-primary btn-lg" onClick={() => setView("signup")}>
+                  <ShieldLogo size={16} /> Create workspace
+                </button>
+                <button className="btn-ghost" onClick={() => setView("login")}>Sign in</button>
+              </>
+            )}
           </div>
         </FadeUp>
       </section>
@@ -704,16 +721,16 @@ function CTAFooter({ setView }: { setView: (v: string) => void }) {
 }
 
 /* ═══════════════════════════ MARKETING ══════════════════════════ */
-function Marketing({ setView }: { setView: (v: string) => void }) {
+function Marketing({ setView, authenticated = false, onLogout }: { setView: (v: string) => void; authenticated?: boolean; onLogout?: () => void }) {
   return (
     <div className="site">
-      <Nav setView={setView} />
-      <Hero setView={setView} />
+      <Nav setView={setView} authenticated={authenticated} onLogout={onLogout} />
+      <Hero setView={setView} authenticated={authenticated} />
       <StatsSection />
       <FeaturesSection />
       <HowSection />
-      <PricingSection setView={setView} />
-      <CTAFooter setView={setView} />
+      <PricingSection setView={setView} authenticated={authenticated} />
+      <CTAFooter setView={setView} authenticated={authenticated} />
     </div>
   );
 }
@@ -1564,7 +1581,7 @@ function App() {
   if (view==="agents")   return <AgentsPage setView={setView} data={shield.data} revokeAgent={shield.revokeAgent} spawnAgent={shield.spawnAgent} onLogout={handleLogout}/>;
   if (view==="settings") return <SettingsPage setView={setView} onLogout={handleLogout}/>;
   if (view==="how-it-works") return <HowItWorksPage setView={setView} onLogout={handleLogout} authenticated={!!apiKey}/>;
-  return <Marketing setView={setView}/>;
+  return <Marketing setView={setView} authenticated={!!apiKey} onLogout={handleLogout}/>;
 }
 
 createRoot(document.getElementById("root")!).render(
