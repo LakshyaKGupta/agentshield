@@ -1,6 +1,52 @@
 # Agent Eval Handoff
 
-## Session Update - 2026-05-30
+## Session Update - 2026-05-30 (Late Session: UX Polish & Backend Hardening)
+
+### Objective
+- Polish the frontend UX to be premium, responsive, and highly interactive (smooth bezier wave, active nav anchors, glow effects, floating chat with suggestions on focus).
+- Connect frontend components with the FastAPI backend instead of relying on mock data.
+- Harden the backend with robust sliding-window rate limiting, request size protection, and a highly comprehensive prompt-injection detection system.
+
+### Completed
+- **Premium Sea Wave & Floating Interactions**:
+  - Implemented a 4-layer breathing bezier wave with smooth, fluid movement.
+  - Reworked cursor to be ultra-smooth and fast with a subtle interactive glow effect.
+  - Cleaned up the layout by aligning the logo block at the absolute left of the navbar and sign-in/CTA buttons at the right.
+  - Eliminated all emojis across the website to establish a cohesive, premium SaaS aesthetic.
+- **Handhold-Style Chat Integration**:
+  - Replaced the simple chat button with a persistent, scroll-proof bottom-center chat box matching Figma/Handhold.io specifications (borders `20px 20px 28px 28px`, a suggestions row, and a sleek ghost send button).
+  - Configured suggestions to appear only upon input focus rather than showing initially, improving first-interaction clarity.
+  - Wired suggestion chips to be fully clickable and interactive, immediately submitting queries when clicked.
+  - Added "Clear Chat" functionality and a click-outside listener to automatically close the chat frame.
+  - Connected the chat interface directly to the FastAPI `/v1/chat` backend rather than using mock responses.
+- **Robust Navbar & Smooth Anchoring**:
+  - Connected navbar links ("Features", "How it works", "Pricing") to their matching sections (`#product`, `#how`, `#pricing`) with smooth-scroll.
+  - Implemented dynamic scrollspy functionality: active links display bold typography and a pop-in dot indicator.
+  - Configured cross-page navigation back to target marketing sections smoothly if clicked from the dashboard.
+  - Restructured vertical scroll clearance with `scroll-margin-top: 72px` so header sections clear the sticky header perfectly.
+- **High-Security Injection Guard**:
+  - Upgraded the prompt-injection engine to run 50+ regex patterns across 10 specialized attack classes (Instruction Override, Prompt Exfiltration, System Token Injection, Jailbreaks, Role Hijacking, Data Exfiltration, SQL Injection, SSRF/Open Redirects, Privilege Escalation, Shell Injection).
+  - Introduced character Shannon Entropy mapping for detecting high-randomness obfuscation vectors.
+  - Designed multi-signal heuristic rules targeting extreme repetition and overlong tokens, automatically escalating verdicts to `BLOCKED/CRITICAL` if multiple distinct threat indicators fire.
+- **Rate-Limiting & Safety Middleware**:
+  - Added a per-IP sliding-window rate limiter in FastAPI restricting unauthenticated public routes to 60 RPM and authenticated API routes to 300 RPM.
+  - Added a request body size ceiling at 1MB to prevent large-payload exhaustion attacks.
+  - Preserved the bootstrap pipeline to seed a developer API key, RS256 key pairs, and a default tenant on app start.
+
+### Files Modified / Created
+- `frontend/src/main.tsx` (Navbar redesign, scrollspy, interactive Figma/Handhold-style chat, clear history, click-outside-to-close)
+- `frontend/src/styles.css` (Smooth bezier wave styling, active scrollspy indicator, typography polish, section clearances)
+- `frontend/vite.config.ts` (Build system configuration)
+- `backend/app/main.py` (FastAPI app-level rate limiting, size guards, bootstrap endpoints)
+- `backend/app/security/injection.py` (Shannon entropy analyzer, repetition heuristics, 50+ threat patterns across 10 attack vectors)
+
+### Architecture Decisions
+- High-performance, in-process memory queue for sliding rate-limiting window ensures that checking rate limit does not add database overhead on the synchronous request path.
+- Completely regex-driven pattern matching and heuristic algorithms on the prompt-injection path, preventing slow, costly LLM blocking calls on the hot-path latency.
+
+---
+
+## Session Update - 2026-05-30 (Early Session: Hero Redesign)
 
 ### Objective
 - Fix hero section animation to exactly match the Handhold.io reference site: staggered fade-up entrance, no waves/orbit labels/3D network globe, minimal canvas orb.
