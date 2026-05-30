@@ -193,9 +193,37 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertGreater(real_agent.risk_score, 0.3)
         self.assertGreater(real_agent.threat_counts.get("instruction_override", 0), 0)
 
+    def test_tenant_preferences_persistence(self) -> None:
+        self.tenant.preferences = {"webhook_url": "https://test.webhook", "webhook_secret": "whsec_123"}
+        self.store.persist_tenant(self.tenant)
+        retrieved = self.store.tenants.get(self.tenant.id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.preferences.get("webhook_url"), "https://test.webhook")
 
+    def test_workspace_user_deletion(self) -> None:
+        from backend.app.store import WorkspaceUser
+        from uuid import uuid4
+        email = "delete_me@example.com"
+        user = WorkspaceUser(id=uuid4(), tenant_id=self.tenant.id, email=email, password_hash="hash")
+        self.store.users[email] = user
+        self.store.persist_user(user)
+        self.assertIn(email, self.store.users)
+        self.store.delete_user(email)
+        self.assertNotIn(email, self.store.users)
+
+    def test_invitation_deletion(self) -> None:
+        from backend.app.store import Invitation
+        from uuid import uuid4
+        inv_id = uuid4()
+        inv = Invitation(id=inv_id, tenant_id=self.tenant.id, email="invite@example.com", role="editor")
+        self.store.invitations[inv_id] = inv
+        self.store.persist_invitation(inv)
+        self.assertIn(inv_id, self.store.invitations)
+        self.store.delete_invitation(inv_id)
+        self.assertNotIn(inv_id, self.store.invitations)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

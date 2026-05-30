@@ -244,8 +244,8 @@ def analyze(
     try:
         verdict = analyze_message(store, settings, request, token or "", public_key)
         if verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
-            key = str(api_key.tenant_id)
-            prefs = _preferences.get(key)
+            tenant = store.tenants.get(api_key.tenant_id)
+            prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
                 from .security.webhook_dispatcher import dispatch_security_webhook
                 alert_payload = {
@@ -287,8 +287,8 @@ def tool_call(
     try:
         verdict = check_tool_call(store, settings, request, token or "", public_key)
         if verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
-            key = str(api_key.tenant_id)
-            prefs = _preferences.get(key)
+            tenant = store.tenants.get(api_key.tenant_id)
+            prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
                 from .security.webhook_dispatcher import dispatch_security_webhook
                 alert_payload = {
@@ -480,34 +480,40 @@ class UserPreferences(BaseModel):
     webhook_url: str | None = None
     webhook_secret: str | None = None
 
-# In-memory preferences store (per-tenant)
-_preferences: dict = {}
+
 
 @app.get("/v1/settings")
 def get_settings_endpoint(api_key=Depends(require_api_key)):
-    key = str(api_key.tenant_id)
+    tenant = store.tenants.get(api_key.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
     import secrets
-    prefs = _preferences.get(key)
-    if prefs is None:
+    prefs = tenant.preferences
+    if not prefs:
         secret = f"whsec_{secrets.token_hex(16)}"
         prefs = UserPreferences(webhook_secret=secret).model_dump()
-        _preferences[key] = prefs
+        tenant.preferences = prefs
+        store.persist_tenant(tenant)
     elif not prefs.get("webhook_secret"):
         prefs["webhook_secret"] = f"whsec_{secrets.token_hex(16)}"
-        _preferences[key] = prefs
+        tenant.preferences = prefs
+        store.persist_tenant(tenant)
     return prefs
 
 @app.put("/v1/settings")
 def update_settings_endpoint(prefs: UserPreferences, api_key=Depends(require_api_key)):
-    key = str(api_key.tenant_id)
+    tenant = store.tenants.get(api_key.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
     import secrets
-    existing = _preferences.get(key, {})
+    existing = tenant.preferences or {}
     secret = existing.get("webhook_secret") or f"whsec_{secrets.token_hex(16)}"
     
     prefs_dict = prefs.model_dump()
     prefs_dict["webhook_secret"] = secret
-    _preferences[key] = prefs_dict
-    return {"status": "saved", "settings": _preferences[key]}
+    tenant.preferences = prefs_dict
+    store.persist_tenant(tenant)
+    return {"status": "saved", "settings": prefs_dict}
 
 
 @app.get("/v1/metrics")
@@ -625,8 +631,8 @@ def rotate_keys(api_key=Depends(require_api_key)):
 
 @app.post("/v1/settings/webhooks/test")
 def test_webhook(background_tasks: BackgroundTasks, api_key=Depends(require_api_key)):
-    key = str(api_key.tenant_id)
-    prefs = _preferences.get(key)
+    tenant = store.tenants.get(api_key.tenant_id)
+    prefs = tenant.preferences if tenant else None
     if prefs is None or not prefs.get("webhook_url"):
         raise HTTPException(
             status_code=400,
@@ -790,14 +796,14 @@ def remove_team_member(member_id: UUID, api_key=Depends(require_api_key)):
         if target_user.role == "owner" and len(owners) <= 1:
             raise HTTPException(status_code=400, detail={"code": "CANNOT_REMOVE_LAST_OWNER", "message": "Workspace must have at least one active owner."})
             
-        del store.users[target_user.email]
+        store.delete_user(target_user.email)
         return {"status": "success", "message": "Team member successfully removed."}
         
     # Check if pending invitation
     if member_id in store.invitations:
         inv = store.invitations[member_id]
         if inv.tenant_id == tid:
-            del store.invitations[member_id]
+            store.delete_invitation(member_id)
             return {"status": "success", "message": "Invitation successfully cancelled."}
             
     raise HTTPException(status_code=404, detail={"code": "MEMBER_NOT_FOUND", "message": "Team member or invitation not found."})

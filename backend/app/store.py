@@ -22,6 +22,8 @@ class Tenant:
     id: UUID
     name: str
     status: str = "active"
+    preferences: dict = field(default_factory=dict)
+
 
 
 @dataclass
@@ -159,6 +161,15 @@ class InMemoryStore:
     def persist_invitation(self, invitation: Invitation) -> None:
         return
 
+    def delete_user(self, email: str) -> None:
+        if email in self.users:
+            del self.users[email]
+
+    def delete_invitation(self, id: UUID) -> None:
+        if id in self.invitations:
+            del self.invitations[id]
+
+
 
 class PostgresStore(InMemoryStore):
     def __init__(self, database_url: str) -> None:
@@ -182,7 +193,12 @@ class PostgresStore(InMemoryStore):
     def _hydrate(self) -> None:
         with self._connect() as conn:
             for row in conn.execute("SELECT * FROM tenants"):
-                self.tenants[row["id"]] = Tenant(id=row["id"], name=row["name"], status=row["status"])
+                self.tenants[row["id"]] = Tenant(
+                    id=row["id"],
+                    name=row["name"],
+                    status=row["status"],
+                    preferences=row.get("preferences") or {},
+                )
             for row in conn.execute("SELECT * FROM workspace_users"):
                 self.users[row["email"]] = WorkspaceUser(
                     id=row["id"],
@@ -279,8 +295,12 @@ class PostgresStore(InMemoryStore):
     def persist_tenant(self, tenant: Tenant) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO tenants (id, name, status) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                (tenant.id, tenant.name, tenant.status),
+                """
+                INSERT INTO tenants (id, name, status, preferences)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, status = EXCLUDED.status, preferences = EXCLUDED.preferences
+                """,
+                (tenant.id, tenant.name, tenant.status, Json(tenant.preferences)),
             )
             conn.commit()
 
@@ -404,6 +424,19 @@ class PostgresStore(InMemoryStore):
                 (invitation.id, invitation.tenant_id, invitation.email, invitation.role, invitation.status, invitation.created_at),
             )
             conn.commit()
+
+    def delete_user(self, email: str) -> None:
+        super().delete_user(email)
+        with self._connect() as conn:
+            conn.execute("DELETE FROM workspace_users WHERE email = %s", (email,))
+            conn.commit()
+
+    def delete_invitation(self, id: UUID) -> None:
+        super().delete_invitation(id)
+        with self._connect() as conn:
+            conn.execute("DELETE FROM invitations WHERE id = %s", (id,))
+            conn.commit()
+
 
 
 
