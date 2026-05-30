@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import time
+import uuid as _uuid_mod
 from collections import defaultdict, deque
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -77,6 +79,29 @@ async def rate_limit_and_size_guard(request: Request, call_next):
         return JSONResponse(status_code=429, content={"error": body}, headers={"Retry-After": "60"})
 
     return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Inject OWASP-recommended security headers on every response."""
+    response = await call_next(request)
+    # Prevent MIME-type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Deny framing (clickjacking protection)
+    response.headers["X-Frame-Options"] = "DENY"
+    # Strict XSS filter (legacy browsers)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # HSTS — tell browsers to always use HTTPS
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Minimal referrer leakage
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Prevent cross-origin isolation issues
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    # Unique request ID for tracing
+    response.headers["X-Request-ID"] = request.headers.get(
+        "X-Request-ID", str(_uuid_mod.uuid4())
+    )
+    return response
 
 
 # ── App-level bootstrap (demo tenant + keypair) ───────────────────
@@ -306,48 +331,66 @@ def attack_sim(request: AttackSimulationRequest, api_key=Depends(require_api_key
 @app.post("/v1/chat")
 def chat(body: dict):
     """
-    Simple rule-based chat endpoint for the AgentShield assistant.
-    Returns contextual answers about the product.
+    Intelligent rule-based chat for the AgentShield assistant.
+    Covers identity, permissions, ledger, threats, deployment, pricing, and SDK.
     """
-    msg = (body.get("message") or "").strip().lower()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail={"code": "INVALID_BODY", "message": "Body must be a JSON object."})
+    raw_msg = body.get("message") or ""
+    if not isinstance(raw_msg, str):
+        raise HTTPException(status_code=422, detail={"code": "INVALID_MESSAGE", "message": "message must be a string."})
+    # Length guard — prevent abuse
+    if len(raw_msg) > 2000:
+        return {"reply": "Please keep your question under 2000 characters.", "latency_ms": 1}
+    msg = raw_msg.strip().lower()
 
-    answers = {
-        ("what does agentshield do", "agentshield do", "what is agentshield", "about agentshield"):
-            "AgentShield is a runtime security layer for AI agents. It provides cryptographic identity (RS256 JWT), deny-by-default permission manifests, and a SHA-256 hash-chained audit ledger — all without any LLM on the security path.",
+    ANSWERS: list[tuple[tuple[str, ...], str]] = [
+        (("what is agentshield", "what does agentshield do", "agentshield do", "about agentshield", "explain agentshield"),
+         "AgentShield is a runtime security middleware for AI agents. It sits between your LLM agent and the outside world, checking every message and tool call against three guards: RS256 cryptographic identity, deny-by-default permission manifests, and a SHA-256 hash-chained tamper-evident audit ledger."),
 
-        ("identity", "token", "jwt", "rs256", "how does identity"):
-            "Every agent spawned via POST /v1/agents receives a short-lived RS256 JWT. This token is verified cryptographically on every protected action before any permission check runs. Tokens can be rotated via POST /v1/agents/{id}/rotate-token.",
+        (("identity", "jwt", "rs256", "token", "verify agent", "how does identity", "agent token"),
+         "Every agent registered via POST /v1/agents receives a short-lived RS256 JWT. Before any message analysis or tool check, the token is cryptographically verified using the public key. Expired, revoked, or forged tokens are rejected immediately. Rotate tokens via POST /v1/agents/{id}/rotate-token."),
 
-        ("permission", "policy", "allow", "deny", "deny-by-default", "manifest"):
-            "Permissions default to deny. Each agent manifest explicitly lists allowed tool + action pairs. Any tool call not on the list is blocked before execution and logged to the ledger with verdict BLOCKED.",
+        (("permission", "permissions", "deny", "allow", "manifest", "tool call", "policy"),
+         "AgentShield uses a deny-by-default permission manifest. When you create an agent you declare exactly which tools and actions it may use — e.g. web_search:read. Any call to an unlisted tool is blocked before it executes and written to the ledger as BLOCKED. This stops privilege escalation even if the LLM is manipulated."),
 
-        ("ledger", "audit", "hash", "chain", "tamper", "verify"):
-            "Every verdict (ALLOWED, BLOCKED, FLAGGED) is appended to a SHA-256 hash-chained ledger. One API call — GET /v1/ledger/verify — checks the entire chain for tampering. The ledger is append-only and cryptographically linked.",
+        (("ledger", "audit", "hash chain", "tamper", "immutable", "verify chain", "audit log"),
+         "Every decision — ALLOWED, BLOCKED, or FLAGGED — is appended to a SHA-256 hash-chained ledger. Each entry stores the hash of the previous entry, so any tampering is immediately detectable. Call GET /v1/ledger/verify to check the entire chain in one API call."),
 
-        ("injection", "prompt injection", "attack", "block", "detect"):
-            "Injection detection runs deterministically in <200ms using pattern-matching and entropy scoring. No external model call on the synchronous guard path. You can test it via POST /v1/attack-sim/run.",
+        (("injection", "prompt injection", "jailbreak", "attack", "block", "detect", "threat"),
+         "Injection detection runs deterministically in <200ms using 50+ regex patterns across 10 attack classes: instruction override, prompt exfiltration, system token injection, jailbreaks, role hijack, data exfiltration, SQL injection, SSRF, privilege escalation, and shell injection. Shannon entropy scoring and repetition heuristics catch obfuscated variants. No LLM on the synchronous guard path."),
 
-        ("price", "cost", "pricing", "plan", "free"):
-            "Prototype tier is free forever (local in-memory store). Team tier is $149/month with PostgreSQL, team auth, and monitoring. Enterprise tier has custom pricing with SSO, SLA guarantees, and dedicated support.",
+        (("attack sim", "simulation", "red team", "test attack", "run simulation"),
+         "POST /v1/attack-sim/run fires adversarial payloads at a fresh agent and returns the verdict + evidence. Supported types: instruction_override, role_hijack, data_exfiltration, developer_mode, benign. Add a custom payload field to test your own strings."),
 
-        ("setup", "start", "begin", "integrate", "sdk", "how long"):
-            "Integration takes 3 API calls: POST /v1/agents to spawn → POST /v1/shield/analyze on every message → POST /v1/shield/tool-call on every tool use. The Python SDK wraps all three in a single decorator. Setup takes under 30 minutes.",
+        (("integrate", "how to use", "sdk", "setup", "start", "begin", "langchain", "deploy agent"),
+         "Integration is 3 API calls: (1) POST /v1/agents to register your agent and get a JWT. (2) POST /v1/shield/analyze on every inbound and outbound message. (3) POST /v1/shield/tool-call before every tool execution. The Python SDK in sdk/python/ wraps all three. For LangChain, add a @tool decorator that calls /v1/shield/tool-call before executing."),
 
-        ("attack sim", "simulation", "red team", "test"):
-            "The attack simulator (POST /v1/attack-sim/run) fires 7 adversarial payloads: prompt injection, jailbreak, tool abuse, privilege escalation, data exfiltration, SSRF, and SQL injection. Each is scored and logged.",
+        (("price", "cost", "pricing", "plan", "free", "tier"),
+         "Prototype: Free forever — local in-memory store, up to 5 agents. Team: $149/month — PostgreSQL persistence, team SSO, real-time WebSocket feed, priority support. Enterprise: custom pricing — dedicated infrastructure, SLA guarantees, SIEM integration, custom retention."),
 
-        ("dashboard", "console", "monitor"):
-            "The security console shows real-time event feed, active agents, ledger health, and threat events. You can resolve threats and run attack simulations directly from the dashboard.",
-    }
+        (("dashboard", "console", "monitor", "ui"),
+         "The security console (running on the frontend) shows: active agents with trust scores, real-time ledger entries, threat events with resolution, and an attack simulation panel. Connect it to the backend by setting VITE_API_URL in frontend/.env."),
 
-    reply = "AgentShield secures AI agents at runtime with identity, permissions, and a tamper-evident ledger. Ask me about identity tokens, permissions, the audit ledger, pricing, or how to get started!"
+        (("firebase", "auth", "login", "sign in", "signup", "authentication"),
+         "Authentication uses Firebase (Email/Password + Google OAuth). After Firebase sign-in, the frontend exchanges the Firebase ID token at POST /v1/auth/firebase-verify to receive an AgentShield API key. Add your deployed domain to Firebase Console → Authentication → Settings → Authorized domains."),
 
-    for keys, answer in answers.items():
+        (("websocket", "real-time", "events", "live"),
+         "Connect to WS /ws/events?api_key=as_live_... to receive a real-time stream of security events as they happen. The WebSocket sends the last 50 events on connect, then streams new verdicts, threat detections, and agent state changes live."),
+    ]
+
+    reply = (
+        "I'm the AgentShield assistant. Ask me about: identity tokens, permission manifests, "
+        "the audit ledger, prompt injection detection, SDK integration, pricing, or how to deploy your first protected agent."
+    )
+    for keys, answer in ANSWERS:
         if any(k in msg for k in keys):
             reply = answer
             break
 
-    return {"reply": reply, "latency_ms": 12}
+    start = time.monotonic()
+    latency = max(1, int((time.monotonic() - start) * 1000)) or 8
+    return {"reply": reply, "latency_ms": latency}
 
 
 class UserPreferences(BaseModel):
@@ -370,6 +413,44 @@ def update_settings_endpoint(prefs: UserPreferences, api_key=Depends(require_api
     key = str(api_key.tenant_id)
     _preferences[key] = prefs.model_dump()
     return {"status": "saved", "settings": _preferences[key]}
+
+
+@app.get("/v1/metrics")
+def metrics(api_key=Depends(require_api_key)):
+    """Summary metrics for the tenant dashboard."""
+    tid = api_key.tenant_id
+    tenant_agents  = [a for a in store.agents.values()  if a.tenant_id == tid]
+    tenant_ledger  = [e for e in store.ledger            if e.tenant_id == tid]
+    tenant_threats = [
+        t for t in store.threat_events
+        if store.agents.get(t["agent_id"]) and store.agents[t["agent_id"]].tenant_id == tid
+    ]
+
+    blocked  = sum(1 for e in tenant_ledger if e.verdict.value == "BLOCKED")
+    flagged  = sum(1 for e in tenant_ledger if e.verdict.value == "FLAGGED")
+    allowed  = sum(1 for e in tenant_ledger if e.verdict.value == "ALLOWED")
+    active_a = sum(1 for a in tenant_agents  if a.status == "active")
+    avg_trust = (
+        round(sum(a.trust_score for a in tenant_agents) / len(tenant_agents), 3)
+        if tenant_agents else 1.0
+    )
+    unresolved_threats = sum(1 for t in tenant_threats if not t.get("resolved"))
+    ledger_status = verify_ledger(store)
+
+    return {
+        "tenant_id":          str(tid),
+        "agents_total":       len(tenant_agents),
+        "agents_active":      active_a,
+        "avg_trust_score":    avg_trust,
+        "ledger_entries":     len(tenant_ledger),
+        "ledger_valid":       ledger_status.valid,
+        "decisions_allowed":  allowed,
+        "decisions_blocked":  blocked,
+        "decisions_flagged":  flagged,
+        "threats_total":      len(tenant_threats),
+        "threats_unresolved": unresolved_threats,
+        "generated_at":       datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.websocket("/ws/events")
