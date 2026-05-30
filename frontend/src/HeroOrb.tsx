@@ -1,9 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 /**
- * HeroWave — pure-canvas ambient wave, matching the Handhold.io reference.
- * Only renders a single soft, slow-moving wave fill at the lower portion
- * of the hero. No colored orbs, no particles.
+ * HeroWave — 3-layer animated sea wave, Handhold.io style.
+ * Colors: violet → sky blue → teal/emerald, drawn on light background.
  */
 export default function HeroWave() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -14,110 +13,101 @@ export default function HeroWave() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animId = 0;
-    let width = 0;
-    let height = 0;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
+    let W = 0, H = 0;
+    let animId = 0;
+    let t = 0;
 
     function resize() {
-      if (!canvas) return;
-      width = canvas.clientWidth || canvas.offsetWidth || 800;
-      height = canvas.clientHeight || canvas.offsetHeight || 600;
-      canvas.width = Math.max(1, Math.floor(width * dpr));
-      canvas.height = Math.max(1, Math.floor(height * dpr));
-      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const p = canvas!.parentElement;
+      W = p ? p.clientWidth  : window.innerWidth;
+      H = p ? p.clientHeight : window.innerHeight;
+      canvas!.width  = Math.round(W * dpr);
+      canvas!.height = Math.round(H * dpr);
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-
     resize();
     const ro = new ResizeObserver(resize);
     if (canvas.parentElement) ro.observe(canvas.parentElement);
 
-    const start = performance.now();
+    /**
+     * Draw one wave layer.
+     * yBase   – vertical centre of the wave (0..1 relative to H)
+     * amp     – amplitude in pixels
+     * freq    – spatial frequency
+     * speed   – animation speed multiplier
+     * phase   – static phase offset so layers are staggered
+     * fillTop – rgba color at the wave crest
+     * stroke  – rgba color for the edge line
+     */
+    function wave(
+      yBase: number, amp: number, freq: number, speed: number, phase: number,
+      fillTop: string, stroke: string,
+    ) {
+      const pts: [number, number][] = [];
 
-    function draw(now: number) {
-      if (!ctx) return;
-      const t = (now - start) * 0.00022; // very slow time
+      for (let i = 0; i <= W; i++) {
+        const x = i;
+        const y =
+          yBase +
+          Math.sin(x * freq + phase + t * speed) * amp +
+          Math.sin(x * freq * 0.55 - phase * 0.6 - t * speed * 0.65) * amp * 0.38;
+        pts.push([x, y]);
+      }
 
-      ctx.clearRect(0, 0, width, height);
+      // ── Filled area below the wave line ──────────────────────────
+      const grad = ctx!.createLinearGradient(0, yBase - amp, 0, H);
+      grad.addColorStop(0, fillTop);
+      grad.addColorStop(1, "rgba(250,250,248,0)");
 
-      // ── Wave 1 (main, very subtle) ──────────────────────────────
-      const baseY = height * 0.68;
-      const amp   = Math.min(width, height) * 0.032;
-      const segs  = 120;
+      ctx!.beginPath();
+      ctx!.moveTo(0, H);
+      ctx!.lineTo(pts[0][0], pts[0][1]);
+      for (const [x, y] of pts) ctx!.lineTo(x, y);
+      ctx!.lineTo(W, H);
+      ctx!.closePath();
+      ctx!.fillStyle = grad;
+      ctx!.fill();
 
-      const drawWave = (
-        yBase: number,
-        ampScale: number,
-        phaseOffset: number,
-        fillColor: string,
-        strokeColor: string
-      ) => {
-        ctx.beginPath();
-        ctx.moveTo(0, height);
-        ctx.lineTo(
-          0,
-          yBase + Math.sin(t * 1.1 + phaseOffset) * amp * ampScale
-        );
-        for (let i = 0; i <= segs; i++) {
-          const x = (i / segs) * width;
-          const y =
-            yBase +
-            Math.sin(x * 0.006 + t + phaseOffset) * amp * ampScale +
-            Math.cos(x * 0.009 - t * 0.85 + phaseOffset) * amp * 0.35 * ampScale;
-          ctx.lineTo(x, y);
-        }
-        ctx.lineTo(width, height);
-        ctx.closePath();
-
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-
-        // Stroke the wave edge only
-        ctx.beginPath();
-        ctx.moveTo(
-          0,
-          yBase + Math.sin(t * 1.1 + phaseOffset) * amp * ampScale
-        );
-        for (let i = 0; i <= segs; i++) {
-          const x = (i / segs) * width;
-          const y =
-            yBase +
-            Math.sin(x * 0.006 + t + phaseOffset) * amp * ampScale +
-            Math.cos(x * 0.009 - t * 0.85 + phaseOffset) * amp * 0.35 * ampScale;
-          ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      };
-
-      // Layer 1 — back fill, very light
-      drawWave(
-        baseY + amp * 0.5,
-        0.9,
-        0.6,
-        "rgba(230, 228, 222, 0.45)",
-        "rgba(200, 198, 190, 0.18)"
-      );
-
-      // Layer 2 — front fill, slightly more visible
-      drawWave(
-        baseY,
-        1.0,
-        0,
-        "rgba(236, 234, 228, 0.55)",
-        "rgba(200, 198, 190, 0.25)"
-      );
-
-      animId = requestAnimationFrame(draw);
+      // ── Wave edge line ────────────────────────────────────────────
+      ctx!.beginPath();
+      ctx!.moveTo(pts[0][0], pts[0][1]);
+      for (const [x, y] of pts) ctx!.lineTo(x, y);
+      ctx!.strokeStyle = stroke;
+      ctx!.lineWidth   = 1.8;
+      ctx!.stroke();
     }
 
-    animId = requestAnimationFrame(draw);
+    function frame() {
+      t += 0.006;
+      ctx!.clearRect(0, 0, W, H);
 
-    return () => {
-      cancelAnimationFrame(animId);
-      ro.disconnect();
-    };
+      // Layer 1 — violet (furthest back)
+      wave(
+        H * 0.60, H * 0.042, 0.0048, 0.55, 0,
+        "rgba(196,181,253,0.22)",
+        "rgba(167,139,250,0.50)",
+      );
+
+      // Layer 2 — sky blue (middle)
+      wave(
+        H * 0.67, H * 0.038, 0.0062, 0.70, 2.1,
+        "rgba(125,211,252,0.20)",
+        "rgba(56,189,248,0.48)",
+      );
+
+      // Layer 3 — teal/emerald (front, most movement)
+      wave(
+        H * 0.74, H * 0.032, 0.0079, 0.85, 4.4,
+        "rgba(94,234,212,0.18)",
+        "rgba(45,212,191,0.42)",
+      );
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    animId = requestAnimationFrame(frame);
+    return () => { cancelAnimationFrame(animId); ro.disconnect(); };
   }, []);
 
   return (
@@ -125,12 +115,10 @@ export default function HeroWave() {
       ref={canvasRef}
       aria-hidden="true"
       style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        pointerEvents: "none",
-        zIndex: 0,
+        position: "absolute", inset: 0,
+        width: "100%", height: "100%",
+        pointerEvents: "none", zIndex: 0,
+        display: "block",
       }}
     />
   );

@@ -58,18 +58,21 @@ function useData(apiKey: string) {
   return {data:d,reload:load,verifyLedger,runAttack,revokeAgent,spawnAgent};
 }
 
-/* ═══════════════════════════ CURSOR ════════════════════════════ */
+/* ═══════════════════════════ CURSOR + GLOW ═════════════════════ */
 function CustomCursor() {
   const dotRef  = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
   const mouse   = useRef({ x: -100, y: -100 });
   const ring    = useRef({ x: -100, y: -100 });
+  const glow    = useRef({ x: -100, y: -100 });
   const rafRef  = useRef(0);
 
   useEffect(() => {
-    const dot  = dotRef.current;
+    const dot    = dotRef.current;
     const ringEl = ringRef.current;
-    if (!dot || !ringEl) return;
+    const glowEl = glowRef.current;
+    if (!dot || !ringEl || !glowEl) return;
 
     const onMove = (e: MouseEvent) => {
       mouse.current = { x: e.clientX, y: e.clientY };
@@ -82,24 +85,27 @@ function CustomCursor() {
     const onDown  = () => { ringEl.classList.add("clicking"); };
     const onUp    = () => { ringEl.classList.remove("clicking"); };
 
-    // Lerp ring to mouse
     const animate = () => {
+      // Ring: fast lerp 12%
       ring.current.x += (mouse.current.x - ring.current.x) * 0.12;
       ring.current.y += (mouse.current.y - ring.current.y) * 0.12;
       ringEl.style.left = ring.current.x + "px";
       ringEl.style.top  = ring.current.y + "px";
+      // Glow: very slow lerp 4% for dreamy trail
+      glow.current.x += (mouse.current.x - glow.current.x) * 0.04;
+      glow.current.y += (mouse.current.y - glow.current.y) * 0.04;
+      glowEl.style.left = glow.current.x + "px";
+      glowEl.style.top  = glow.current.y + "px";
       rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
 
     document.addEventListener("mousemove", onMove);
-
     const interactables = () => document.querySelectorAll("button, a, input, select, textarea, [data-hover]");
     const attach = () => interactables().forEach(el => { el.addEventListener("mouseenter", onEnter); el.addEventListener("mouseleave", onLeave); });
     attach();
     const mo = new MutationObserver(attach);
     mo.observe(document.body, { childList: true, subtree: true });
-
     document.addEventListener("mousedown", onDown);
     document.addEventListener("mouseup", onUp);
 
@@ -114,6 +120,7 @@ function CustomCursor() {
 
   return (
     <>
+      <div ref={glowRef} className="cursor-glow" />
       <div ref={dotRef}  className="cursor-dot"  />
       <div ref={ringRef} className="cursor-ring" />
     </>
@@ -201,47 +208,50 @@ function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?:
 }
 
 /* ═══════════════════════════ CHATBOT ════════════════════════════ */
+/* ═══════════════════════════ PERSISTENT CHAT ════════════════════ */
 type ChatMsg = { role: "bot" | "user"; text: string; ts: string };
 
 const BOT_RESPONSES: Record<string, string> = {
-  default: "AgentShield protects AI agents at runtime with identity verification, permission enforcement, and a tamper-evident audit ledger — all deterministic, no LLM on the guard path.",
-  identity: "Every agent receives a short-lived RS256 JWT identity token on spawn. This cryptographic identity is verified on every protected action before any permission check runs.",
-  permission: "Permissions are deny-by-default. An agent's manifest explicitly allows specific tool + action combinations. Anything not listed is blocked before it executes.",
-  ledger: "Every protected verdict — ALLOWED, BLOCKED, or FLAGGED — is written to a hash-chained audit ledger. You can verify the full chain integrity with a single API call.",
-  injection: "AgentShield classifies prompt injection attempts deterministically in <200 ms using pattern-matching — no external model call on the synchronous guard path.",
-  pricing: "AgentShield is free for local evaluation (Prototype plan). The Team plan at $149/mo adds PostgreSQL persistence, team auth, and monitoring. Enterprise includes SSO and custom retention.",
-  start: "To get started: POST /v1/agents to spawn a protected agent → POST /v1/shield/analyze on every incoming message → POST /v1/shield/tool-call before each tool execution. The Python SDK wraps all three.",
+  default:    "AgentShield protects AI agents at runtime — identity, permissions, and a hash-chained audit ledger. No LLM on the guard path. Ask me anything specific!",
+  identity:   "Every agent receives a short-lived RS256 JWT on spawn. This cryptographic identity is verified on every protected action before any permission check runs.",
+  permission: "Permissions default to deny. Each agent manifest explicitly lists allowed tool + action pairs. Anything unlisted is blocked before execution.",
+  ledger:     "Every verdict (ALLOWED, BLOCKED, FLAGGED) is appended to a SHA-256 hash-chained ledger. One API call — GET /v1/ledger/verify — checks the entire chain for tampering.",
+  injection:  "Injection detection runs deterministically in <200ms using pattern-matching and entropy scoring. No external model call on the synchronous guard path.",
+  pricing:    "Prototype: free forever (local evaluation). Team: $149/mo (PostgreSQL, team auth, monitoring). Enterprise: custom (SSO, custom retention, dedicated support).",
+  start:      "Three API calls to integrate: POST /v1/agents (spawn) → POST /v1/shield/analyze (every message) → POST /v1/shield/tool-call (every tool). The Python SDK wraps all three.",
+  wave:       "The hero section features a 3-layer animated sea wave in violet, sky blue, and teal — rendered on an HTML5 canvas with frame-by-frame sine interpolation.",
+  security:   "AgentShield provides: (1) RS256 identity tokens, (2) deny-by-default permission manifests, (3) hash-chained audit ledger, (4) <200ms injection detection. All synchronous.",
 };
 
 function getBotReply(input: string): string {
   const q = input.toLowerCase();
-  if (q.match(/identity|token|jwt|rs256/)) return BOT_RESPONSES.identity;
-  if (q.match(/permiss|policy|allow|deny|tool/)) return BOT_RESPONSES.permission;
-  if (q.match(/ledger|audit|hash|chain|tamper/)) return BOT_RESPONSES.ledger;
-  if (q.match(/inject|prompt|attack|block/)) return BOT_RESPONSES.injection;
-  if (q.match(/pric|cost|plan|money|free/)) return BOT_RESPONSES.pricing;
-  if (q.match(/start|begin|integrat|how|setup|install/)) return BOT_RESPONSES.start;
+  if (q.match(/identity|token|jwt|rs256|auth/))      return BOT_RESPONSES.identity;
+  if (q.match(/permiss|policy|allow|deny|tool|mani/)) return BOT_RESPONSES.permission;
+  if (q.match(/ledger|audit|hash|chain|tamper|verif/)) return BOT_RESPONSES.ledger;
+  if (q.match(/inject|prompt|attack|block|detect/))  return BOT_RESPONSES.injection;
+  if (q.match(/pric|cost|plan|money|free|tier/))     return BOT_RESPONSES.pricing;
+  if (q.match(/start|begin|integrat|how|setup|sdk/)) return BOT_RESPONSES.start;
+  if (q.match(/wave|hero|animat|design|visual/))     return BOT_RESPONSES.wave;
+  if (q.match(/secur|protect|safe|guard|runtime/))   return BOT_RESPONSES.security;
   return BOT_RESPONSES.default;
 }
 
-const SUGGESTED_CHIPS = [
+const CHIPS = [
   "How does identity work?",
-  "What is deny-by-default?",
+  "Explain deny-by-default",
   "How is the ledger verified?",
+  "How do I get started?",
 ];
 
-function Chatbot() {
-  const [open, setOpen]       = useState(false);
-  const [msgs, setMsgs]       = useState<ChatMsg[]>([
-    { role: "bot", text: "Hi! I'm the AgentShield assistant. Ask me anything about runtime AI security.", ts: now() },
+function PersistentChat() {
+  const getTs = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const [collapsed, setCollapsed] = useState(false);
+  const [msgs, setMsgs]   = useState<ChatMsg[]>([
+    { role: "bot", text: "Hi! I'm the AgentShield assistant. I can answer questions about runtime AI security, identity, permissions, and the audit ledger.", ts: getTs() },
   ]);
-  const [input, setInput]     = useState("");
-  const [typing, setTyping]   = useState(false);
-  const bottomRef             = useRef<HTMLDivElement>(null);
-
-  function now() {
-    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -249,128 +259,111 @@ function Chatbot() {
 
   const send = (text: string) => {
     if (!text.trim()) return;
-    const userMsg: ChatMsg = { role: "user", text: text.trim(), ts: now() };
-    setMsgs(m => [...m, userMsg]);
+    setMsgs(m => [...m, { role: "user", text: text.trim(), ts: getTs() }]);
     setInput("");
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      setMsgs(m => [...m, { role: "bot", text: getBotReply(text), ts: now() }]);
-    }, 900 + Math.random() * 400);
-  };
-
-  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") send(input);
+      setMsgs(m => [...m, { role: "bot", text: getBotReply(text), ts: getTs() }]);
+    }, 800 + Math.random() * 500);
   };
 
   return (
-    <>
-      {/* FAB */}
-      <button className="chatbot-fab" onClick={() => setOpen(o => !o)} aria-label="Open chat">
-        {open ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <div className={`pchat ${collapsed ? "pchat--collapsed" : ""}`} role="complementary" aria-label="AgentShield assistant">
+      {/* Collapse tab — visible when collapsed */}
+      {collapsed && (
+        <button className="pchat__tab" onClick={() => setCollapsed(false)} aria-label="Open chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
           </svg>
-        )}
-      </button>
+          Chat
+        </button>
+      )}
 
-      {/* Panel */}
-      <div className={`chatbot-panel ${open ? "chatbot-panel--open" : "chatbot-panel--hidden"}`} role="dialog" aria-label="AgentShield chat">
+      {/* Full panel */}
+      <div className="pchat__panel">
         {/* Header */}
-        <div className="chatbot-header">
-          <div className="chatbot-header__info">
-            <div className="chatbot-avatar">
+        <div className="pchat__header">
+          <div className="pchat__header-left">
+            <div className="pchat__avatar">
               <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
             </div>
             <div>
-              <div className="chatbot-header__name">AgentShield AI</div>
-              <div className="chatbot-header__status">● Online</div>
+              <div className="pchat__name">AgentShield AI</div>
+              <div className="pchat__status"><span className="pchat__online-dot"/>Online</div>
             </div>
           </div>
-          <button className="chatbot-close" onClick={() => setOpen(false)}>×</button>
+          <button className="pchat__minimize" onClick={() => setCollapsed(true)} aria-label="Minimize chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
         </div>
 
         {/* Messages */}
-        <div className="chatbot-messages">
+        <div className="pchat__messages">
           {msgs.map((m, i) => (
-            <div key={i} className={`msg msg--${m.role}`}>
-              <div className="msg__bubble">{m.text}</div>
-              <div className="msg__time">{m.ts}</div>
+            <div key={i} className={`pchat-msg pchat-msg--${m.role}`}>
+              {m.role === "bot" && (
+                <div className="pchat-msg__avatar">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                </div>
+              )}
+              <div className="pchat-msg__content">
+                <div className="pchat-msg__bubble">{m.text}</div>
+                <div className="pchat-msg__time">{m.ts}</div>
+              </div>
             </div>
           ))}
           {typing && (
-            <div className="msg msg--bot">
-              <div className="msg__bubble" style={{ background: "var(--bg-alt)", border: "1px solid var(--line)" }}>
-                <div className="chatbot-typing"><span/><span/><span/></div>
+            <div className="pchat-msg pchat-msg--bot">
+              <div className="pchat-msg__avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <div className="pchat-msg__content">
+                <div className="pchat-msg__bubble pchat-msg__bubble--typing">
+                  <span/><span/><span/>
+                </div>
               </div>
             </div>
           )}
-          <div ref={bottomRef} />
+          <div ref={bottomRef}/>
         </div>
 
-        {/* Suggestion chips */}
-        <div className="chatbot-chips">
-          {SUGGESTED_CHIPS.map(c => (
-            <button key={c} className="chatbot-chip" onClick={() => send(c)}>{c}</button>
+        {/* Chips */}
+        <div className="pchat__chips">
+          {CHIPS.map(c => (
+            <button key={c} className="pchat__chip" onClick={() => send(c)}>{c}</button>
           ))}
         </div>
 
         {/* Input */}
-        <div className="chatbot-input-row">
+        <div className="pchat__input-row">
           <input
-            className="chatbot-input"
+            className="pchat__input"
             placeholder="Ask about AgentShield…"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={onKey}
+            onKeyDown={e => e.key === "Enter" && send(input)}
           />
-          <button className="chatbot-send" onClick={() => send(input)}>
+          <button className="pchat__send" onClick={() => send(input)} aria-label="Send">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
           </button>
         </div>
       </div>
-    </>
-  );
-}
-
-/* ═══════════════════════════ HERO CHAT BAR ══════════════════════ */
-function HeroChatBar({ setView }: { setView: (v: string) => void }) {
-  const [val, setVal] = useState("");
-  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && val.trim()) setView("signup");
-  };
-  return (
-    <div className="hero__chat">
-      <div className="hero__chat-inner">
-        <input
-          className="hero__chat-input"
-          placeholder="Ask about protecting your AI agents…"
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          onKeyDown={onKey}
-        />
-        <div className="hero__chat-suggestions">
-          {["Identity","Ledger","Pricing"].map(s => (
-            <button key={s} className="hero__chat-suggestion">{s}</button>
-          ))}
-        </div>
-        <button className="hero__chat-send" onClick={() => setView("signup")}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
-      </div>
     </div>
   );
 }
+
+/* HeroChatBar removed — replaced by PersistentChat sidebar */
 
 /* ═══════════════════════════ HERO ═══════════════════════════════ */
 /* Hero is now imported from Hero.tsx */
@@ -944,6 +937,6 @@ createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <CustomCursor />
     <App />
-    <Chatbot />
+    <PersistentChat />
   </ErrorBoundary>
 );
