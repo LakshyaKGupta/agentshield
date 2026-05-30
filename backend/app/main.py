@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from collections import defaultdict, deque
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -27,6 +29,57 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Sliding-window rate limiter (in-process, per client IP) ───────
+_rate_buckets: dict[str, deque] = defaultdict(deque)
+
+MAX_BODY_BYTES   = 1 * 1024 * 1024   # 1 MB
+PUBLIC_RPM       = 60                 # unauthenticated endpoints
+AUTHED_RPM       = 300               # authenticated endpoints
+WINDOW_SECONDS   = 60
+
+# Endpoints that carry an API key are counted separately
+_AUTHED_PREFIXES = ("/v1/agents", "/v1/shield", "/v1/ledger", "/v1/threats", "/v1/attack", "/v1/settings")
+
+
+def _check_rate_limit(client_ip: str, limit: int) -> None:
+    now = time.monotonic()
+    bucket = _rate_buckets[client_ip]
+    while bucket and now - bucket[0] > WINDOW_SECONDS:
+        bucket.popleft()
+    if len(bucket) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMIT_EXCEEDED", "message": f"Too many requests. Limit: {limit}/min."},
+            headers={"Retry-After": "60"},
+        )
+    bucket.append(now)
+
+
+@app.middleware("http")
+async def rate_limit_and_size_guard(request: Request, call_next):
+    # 1. Request body size guard
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_BYTES:
+        return JSONResponse(
+            status_code=413,
+            content={"error": {"code": "PAYLOAD_TOO_LARGE", "message": "Request body exceeds 1 MB limit."}},
+        )
+
+    # 2. Rate limiting per client IP
+    client_ip = request.client.host if request.client else "unknown"
+    path = request.url.path
+    limit = AUTHED_RPM if path.startswith(_AUTHED_PREFIXES) else PUBLIC_RPM
+    try:
+        _check_rate_limit(client_ip, limit)
+    except HTTPException as exc:
+        body = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+        return JSONResponse(status_code=429, content={"error": body}, headers={"Retry-After": "60"})
+
+    return await call_next(request)
+
+
+# ── App-level bootstrap (demo tenant + keypair) ───────────────────
 tenant = store.seed_tenant()
 private_key, public_key = generate_dev_keypair()
 demo_api_key = create_api_key(store, settings, tenant.id)
