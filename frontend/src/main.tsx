@@ -86,14 +86,14 @@ function CustomCursor() {
     const onUp    = () => { ringEl.classList.remove("clicking"); };
 
     const animate = () => {
-      // Ring: fast lerp 12%
-      ring.current.x += (mouse.current.x - ring.current.x) * 0.12;
-      ring.current.y += (mouse.current.y - ring.current.y) * 0.12;
+      // Ring: snappy lerp — closer to mouse
+      ring.current.x += (mouse.current.x - ring.current.x) * 0.22;
+      ring.current.y += (mouse.current.y - ring.current.y) * 0.22;
       ringEl.style.left = ring.current.x + "px";
       ringEl.style.top  = ring.current.y + "px";
-      // Glow: very slow lerp 4% for dreamy trail
-      glow.current.x += (mouse.current.x - glow.current.x) * 0.04;
-      glow.current.y += (mouse.current.y - glow.current.y) * 0.04;
+      // Glow: soft trail
+      glow.current.x += (mouse.current.x - glow.current.x) * 0.09;
+      glow.current.y += (mouse.current.y - glow.current.y) * 0.09;
       glowEl.style.left = glow.current.x + "px";
       glowEl.style.top  = glow.current.y + "px";
       rafRef.current = requestAnimationFrame(animate);
@@ -190,14 +190,17 @@ function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?:
     <header ref={navRef} className={`nav ${solid ? "nav--solid" : ""} ${scrolled ? "nav--scrolled" : ""}`}
       style={{ opacity: 0, transform: "translateY(-8px)" }}>
       <div className="nav__inner">
+        {/* Brand — always far left */}
         <button className="nav__brand" onClick={() => setView("home")}>
           <ShieldLogo size={20} /> AgentShield
         </button>
+        {/* Center links */}
         <nav className="nav__center">
           {[["product","Features"],["how","How it works"],["pricing","Pricing"]].map(([v,l]) => (
             <button key={v} className="nav__link" onClick={() => setView(v)}>{l}</button>
           ))}
         </nav>
+        {/* Auth — always far right */}
         <div className="nav__right">
           <button className="nav__signin" onClick={() => setView("login")}>Sign in</button>
           <button className="nav__cta" onClick={() => setView("signup")}>Get started</button>
@@ -246,8 +249,12 @@ function HandholdChat() {
   const [input, setInput]       = useState("");
   const [typing, setTyping]     = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [focused, setFocused]   = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
+
+  // Show chips when focused OR when there are no messages yet
+  const showChips = focused || msgs.length > 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -301,14 +308,16 @@ function HandholdChat() {
 
       {/* Main card: chips + input */}
       <div className="hchat__card">
-        {/* Suggestion chips — horizontally scrollable */}
-        <div className="hchat__chips-row">
-          {CHIPS.map(c => (
-            <button key={c} className="hchat__chip" onClick={() => send(c)}>
-              {c}
-            </button>
-          ))}
-        </div>
+        {/* Suggestion chips — appear only when focused or chatting */}
+        {showChips && (
+          <div className="hchat__chips-row">
+            {CHIPS.map(c => (
+              <button key={c} className="hchat__chip" onClick={() => { send(c); inputRef.current?.focus(); }}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
         {/* Input row */}
         <div className="hchat__input-row">
           <textarea
@@ -318,6 +327,8 @@ function HandholdChat() {
             rows={1}
             value={input}
             onChange={e => setInput(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
           />
           <button
