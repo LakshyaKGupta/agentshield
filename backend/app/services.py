@@ -76,6 +76,51 @@ def login_workspace(store: InMemoryStore, settings: Settings, request: Workspace
     return WorkspaceAuthResponse(tenant_id=tenant.id, workspace_name=tenant.name, email=email, api_key=api_key)
 
 
+def firebase_verify_and_login(
+    store: InMemoryStore,
+    settings: Settings,
+    firebase_id_token: str,
+    workspace_name: str | None = None,
+) -> WorkspaceAuthResponse:
+    """Verify a Firebase ID token and return (or create) an AgentShield workspace session.
+
+    - On first login: auto-creates a workspace for the Firebase user.
+    - On subsequent logins: returns a fresh API key for the existing workspace.
+    """
+    from .security.firebase_auth import verify_firebase_id_token
+
+    claims = verify_firebase_id_token(firebase_id_token)
+    email = _normalize_email(claims.get("email") or f"{claims['uid']}@firebase.local")
+    uid = claims["uid"]
+
+    # Re-use existing workspace if the email was already registered
+    if email in store.users:
+        user = store.users[email]
+        tenant = store.tenants[user.tenant_id]
+        api_key = create_api_key(store, settings, tenant.id)
+        return WorkspaceAuthResponse(tenant_id=tenant.id, workspace_name=tenant.name, email=email, api_key=api_key)
+
+    # First-time Firebase login — provision a workspace
+    ws_name = workspace_name or f"Workspace ({email.split('@')[0]})"
+    tenant = Tenant(id=uuid4(), name=ws_name, status="active")
+    store.tenants[tenant.id] = tenant
+    store.persist_tenant(tenant)
+
+    # Store user with a random unhashed password (Firebase handles auth)
+    placeholder_pw = _hash_password(secrets.token_hex(32))
+    user = WorkspaceUser(
+        id=uuid4(), tenant_id=tenant.id, email=email, password_hash=placeholder_pw,
+    )
+    user.firebase_uid = uid  # type: ignore[attr-defined]
+    store.users[email] = user
+    store.persist_user(user)
+
+    api_key = create_api_key(store, settings, tenant.id)
+    return WorkspaceAuthResponse(tenant_id=tenant.id, workspace_name=tenant.name, email=email, api_key=api_key)
+
+
+
+
 def _trust_delta(verdict: Verdict, evidence: list[Evidence]) -> float:
     if any(e.code == "POLICY_TOOL_DENIED" for e in evidence):
         return -0.2

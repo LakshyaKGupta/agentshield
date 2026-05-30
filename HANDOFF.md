@@ -1,5 +1,49 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-05-30
+
+### Objective
+- Fix hero section animation to exactly match the Handhold.io reference site: staggered fade-up entrance, no waves/orbit labels/3D network globe, minimal canvas orb.
+- Add 5 new sections after the hero section on the marketing homepage.
+
+### Completed
+- **Hero animation redesign** (matches Handhold.io pattern exactly):
+  - Removed Three.js network globe, wave divs, orbit labels, and network-status pill from hero.
+  - Replaced with `HeroOrb.tsx`: a new pure-canvas ambient orb (multi-layer radial gradients + floating particle field) — no external dependencies.
+  - Staggered fade-up entrance for announce bar → h1 → subtitle → CTA buttons, using CSS transitions triggered in JS with delay offsets (matching Handhold's `opacity:0; transform:translateY(12px)` → animated style pattern).
+  - Sticky nav that becomes glass-frosted on scroll (`hn-nav--scrolled`).
+- **5 new homepage sections** (all scroll-triggered fade-up via IntersectionObserver):
+  1. **Logo Strip** — horizontally scrolling marquee of partner/customer logos.
+  2. **Stats Row** — 200ms, RS256, SHA-256, <5ms metrics in a bordered grid.
+  3. **Features Grid** — 2×2 card grid with icon, eyebrow, title, body for Identity / Permission Guard / Audit Ledger / Injection Guard.
+  4. **How It Works** — numbered step rows (01/02/03) with route code badges + terminal demo card with green/amber/red traffic-light bar and monospace output.
+  5. **Security Details** — two-column layout: text/CTA left, feature list right.
+  6. **Pricing Preview** — 3-column plan cards (Prototype / Team / Enterprise) with feature lists and CTAs.
+  7. **CTA Band** + **Footer** with nav columns.
+- **CSS full rewrite** (`styles.css`): Inter font via Google Fonts, new design token set, all new `hn-*` namespaced classes, responsive at 1024/880/700/480px breakpoints.
+- Removed `AgentNetworkScene.tsx` import from main.tsx (file kept for reference, no longer used).
+- `npm run build` passes: 23.28 kB CSS (gzip 5.27 kB) + 230.02 kB JS (gzip 71.33 kB) — Three.js removed, significantly smaller bundle.
+
+### Files Modified
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `frontend/src/HeroOrb.tsx` (new)
+- `HANDOFF.md`
+
+### Architecture Decisions
+- HeroOrb uses a native canvas with `requestAnimationFrame`, no library dependency. This eliminates the Three.js chunk (~500 kB) from the bundle.
+- Scroll-reveal uses a single `IntersectionObserver` per section via the `useFadeUp` hook — no scroll event listeners.
+- Hero entrance uses JS-driven inline style transitions (not keyframe animations) to match the Handhold.io pattern of `opacity:0; transform:translateY(12px)` → resolve after mount.
+
+### Verification
+- `npm run build` passed. No chunk-size warnings (Three.js removed).
+- Dev server running at `http://127.0.0.1:5174/`.
+
+### Notes For Next Agent
+- `AgentNetworkScene.tsx` is still present in `frontend/src/` but no longer imported. Safe to delete if bundle cleanup is needed.
+- The dashboard, ledger, attack sim, and agents app shell pages are unchanged.
+- Three.js dependency is still in `package.json` — remove it if Three.js won't be reintroduced.
+
 ## Session Update - 2026-05-29
 
 ### Objective
