@@ -13,15 +13,23 @@
 - **SaaS Distributable Packaging & Verification**:
   - Built the PyPI-ready source distribution and optimized Python wheels (`setup.py sdist bdist_wheel`).
   - Verified local installation (`pip install dist/agentshield-1.0.0-py3-none-any.whl --force-reinstall`) and confirmed package imports execute perfectly with 0 module errors.
-- **Production Postgres Store Ready**:
-  - Validated that the Postgres database persistence schema and migrations initialize seamlessly with no errors.
+- **Production Postgres Settings & Preferences Persistence**:
+  - Eliminated the global, in-memory `_preferences` state in `main.py`.
+  - Added a `preferences` JSONB column to the `tenants` migration schema and mapped hydration/serialization durably. Webhook URLs, signing secrets, and operator preferences now persist securely across restarts.
+- **Durable Team & Invitation Deletions**:
+  - Implemented `delete_user` and `delete_invitation` database hooks in `PostgresStore` and wired the `/v1/team/members/{id}` delete endpoint. Active users and pending invites are now removed durably from the database rather than just memory dictionaries.
 - **Continuous Quality Control**:
-  - Re-ran the full suite of integration tests (11/11 tests pass cleanly).
+  - Wrote and executed 3 new integration tests verifying preferences persistence, user deletions, and invitation deletions.
+  - Re-ran the full suite of integration tests (14/14 tests pass cleanly).
   - Confirmed the frontend and backend servers are running beautifully on ports 5173 and 8000.
 
 ### Files Modified
 - `sdk/python/agentshield/__init__.py` (Wrapped LangChain callback import in lazy try-except block)
 - `sdk/python/agentshield/integrations/__init__.py` (Wrapped LangChain callback import in lazy try-except block)
+- `backend/migrations/001_initial_schema.sql` (Added preferences column to tenants schema and ALTER statement)
+- `backend/app/store.py` (Implemented preferences serialization, and delete_user/delete_invitation Postgres persistence hooks)
+- `backend/app/main.py` (Refactored settings endpoint, test webhook endpoint, and team delete endpoints to persist durably)
+- `tests/test_security_core.py` (Added 3 new integration tests covering preferences persistence and deletions)
 - `HANDOFF.md` (Documented session update)
 
 ---
