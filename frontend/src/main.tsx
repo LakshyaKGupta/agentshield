@@ -267,7 +267,7 @@ function Nav({ setView, solid = false, authenticated = false, onLogout }: { setV
 /* ══════════════════════════ HANDHOLD-STYLE CHAT BAR ════════════ */
 type ChatMsg = { role: "bot" | "user"; text: string; ts: string };
 
-const BACKEND_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8000`;
 
 const CHIPS = [
   "What does AgentShield do?",

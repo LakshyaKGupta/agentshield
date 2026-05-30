@@ -24,13 +24,23 @@ settings = get_settings()
 store = create_store(settings.database_url)
 
 app = FastAPI(title="AgentShield API", version=settings.app_version)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=list(settings.allowed_origins),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if settings.demo_mode or "*" in settings.allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.allowed_origins),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 
 # ── Sliding-window rate limiter (in-process, per client IP) ───────
 _rate_buckets: dict[str, deque] = defaultdict(deque)
