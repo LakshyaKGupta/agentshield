@@ -170,11 +170,40 @@ function ShieldLogo({ size = 22 }: { size?: number }) {
 /* ═══════════════════════════ NAV ════════════════════════════════ */
 function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
+  const [active, setActive]     = useState("");
   const navRef = useRef<HTMLElement>(null);
 
+  // Helper: scroll to a section by ID (works on same page or after navigating home)
+  const scrollTo = (id: string) => {
+    // If we're not on the marketing page, go home first, then scroll after paint
+    const el = document.getElementById(id);
+    if (!el) {
+      setView("home");
+      setTimeout(() => {
+        const target = document.getElementById(id);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+    } else {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", h, { passive: true });
+    const onScroll = () => {
+      setScrolled(window.scrollY > 10);
+      // Scrollspy: find which section is in view
+      const ids = ["product", "how", "pricing"];
+      let found = "";
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 100 && rect.bottom > 100) { found = id; break; }
+        }
+      }
+      setActive(found);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
     // Slide in on mount
     const el = navRef.current;
     if (el) {
@@ -183,21 +212,33 @@ function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?:
         el.style.opacity = "1"; el.style.transform = "translateY(0)";
       }), 100);
     }
-    return () => window.removeEventListener("scroll", h);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const NAV_LINKS = [
+    { id: "product",  label: "Features"     },
+    { id: "how",      label: "How it works" },
+    { id: "pricing",  label: "Pricing"      },
+  ];
 
   return (
     <header ref={navRef} className={`nav ${solid ? "nav--solid" : ""} ${scrolled ? "nav--scrolled" : ""}`}
       style={{ opacity: 0, transform: "translateY(-8px)" }}>
       <div className="nav__inner">
         {/* Brand — always far left */}
-        <button className="nav__brand" onClick={() => setView("home")}>
+        <button className="nav__brand" onClick={() => { setView("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
           <ShieldLogo size={20} /> AgentShield
         </button>
-        {/* Center links */}
+        {/* Center links — scroll to section */}
         <nav className="nav__center">
-          {[["product","Features"],["how","How it works"],["pricing","Pricing"]].map(([v,l]) => (
-            <button key={v} className="nav__link" onClick={() => setView(v)}>{l}</button>
+          {NAV_LINKS.map(({ id, label }) => (
+            <button
+              key={id}
+              className={`nav__link${active === id ? " nav__link--active" : ""}`}
+              onClick={() => scrollTo(id)}
+            >
+              {label}
+            </button>
           ))}
         </nav>
         {/* Auth — always far right */}

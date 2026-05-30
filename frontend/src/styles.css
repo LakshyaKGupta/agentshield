@@ -152,8 +152,29 @@ ul, ol { list-style: none; }
   padding: 8px 14px; border-radius: var(--r-full);
   font-size: 14px; font-weight: 500; color: var(--ink-60);
   transition: color 150ms ease, background 150ms ease;
+  position: relative;
 }
 .nav__link:hover { color: var(--ink); background: rgba(17,17,17,.05); }
+/* Scrollspy active state: small underline dot */
+.nav__link--active {
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav__link--active::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: dotPop 200ms cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes dotPop {
+  from { transform: translateX(-50%) scale(0); opacity: 0; }
+  to   { transform: translateX(-50%) scale(1); opacity: 1; }
+}
 .nav__right { display: flex; align-items: center; gap: 10px; justify-self: end; }
 .nav__signin {
   padding: 8px 16px;
@@ -405,6 +426,9 @@ ul, ol { list-style: none; }
 .section--alt { background: var(--bg-alt); }
 .section--white { background: var(--bg-card); }
 .section--border { border-top: 1px solid var(--line); }
+/* Clear sticky nav on anchor scroll */
+[id="product"], [id="how"], [id="pricing"] { scroll-margin-top: 72px; }
+
 
 /* Section header */
 .sh { max-width: 560px; margin-bottom: 56px; }
