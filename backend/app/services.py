@@ -227,6 +227,28 @@ def analyze_message(
     verify_agent_token(store, settings, token, public_key_pem, request.agent_id)
     agent = store.agents[request.agent_id]
     detection = detect_injection(request.message)
+    
+    # 🧪 Dynamic Hot-Path Sandbox fallback for flagged prompts
+    if detection.verdict == Verdict.FLAGGED:
+        from .security.sandbox import LLMEvaluationSandbox
+        from .security.injection import DetectionResult
+        sandbox = LLMEvaluationSandbox()
+        sandbox_res = sandbox.evaluate(request.message, getattr(request, "context", None))
+        
+        detection = DetectionResult(
+            verdict=sandbox_res.verdict,
+            threat_level=sandbox_res.threat_level,
+            evidence=detection.evidence + [
+                Evidence(
+                    source="sandbox",
+                    code=sandbox_res.classification,
+                    message=sandbox_res.analysis,
+                    confidence=sandbox_res.risk_score,
+                    span=None
+                )
+            ]
+        )
+
     delta = _trust_delta(detection.verdict, detection.evidence)
     trust_score = _apply_trust(agent, delta)
     severity = Severity.CRITICAL if detection.threat_level == ThreatLevel.CRITICAL else Severity.WARN if detection.verdict == Verdict.FLAGGED else Severity.INFO
