@@ -296,11 +296,17 @@ function HandholdChat() {
 
       {/* Main card: chips + input */}
       <div className="hchat__card">
-        {/* Suggestion chips — appear only when focused or chatting */}
+        {/* Suggestion chips — appear only when focused or after first message */}
         {showChips && (
           <div className="hchat__chips-row">
             {CHIPS.map(c => (
-              <button key={c} className="hchat__chip" onClick={() => { send(c); inputRef.current?.focus(); }}>
+              <button
+                key={c}
+                className="hchat__chip"
+                // onMouseDown+preventDefault stops the textarea from blurring before onClick fires
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { void send(c); }}
+              >
                 {c}
               </button>
             ))}

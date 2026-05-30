@@ -838,21 +838,28 @@ ul, ol { list-style: none; }
   flex-shrink: 0;
   padding: 4px 12px;
   border-radius: 99px;
-  border: 1px solid rgba(0,0,0,.1);
-  background: rgba(255,255,255,.9);
-  box-shadow: 0 1px 4px rgba(0,0,0,.05);
-  font-size: 13px; font-weight: 400;
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  font-size: 13px; font-weight: 500;
   line-height: 1.4;
   letter-spacing: .01em;
   color: #111;
   font-family: Inter, sans-serif;
   white-space: nowrap;
-  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+  transition: background 130ms ease, border-color 130ms ease, box-shadow 130ms ease, transform 130ms cubic-bezier(.34,1.56,.64,1);
 }
 .hchat__chip:hover {
   background: #fff;
-  border-color: rgba(0,0,0,.18);
-  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  border-color: rgba(0,0,0,.22);
+  box-shadow: 0 3px 10px rgba(0,0,0,.10);
+  transform: translateY(-1px);
+}
+.hchat__chip:active {
+  transform: scale(0.96);
+  box-shadow: none;
+  background: #f4f4f2;
 }
 
 /* ── Input row ─────────────────────────────────────────────────── */
