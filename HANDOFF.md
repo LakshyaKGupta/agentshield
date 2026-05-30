@@ -1,21 +1,31 @@
 # Agent Eval Handoff
 
-## Session Update - 2026-05-30 (Night Session: Resilient Firebase Auth Fallback & Server Restart)
+## Session Update - 2026-05-30 (Night Session: Resilient Firebase Auth Fallback & Pristine Workspace Onboarding)
 
 ### Objective
 - Resolve the Firebase token verification issue caused by missing Application Default Credentials (ADC) in local development environments.
 - Provide a resilient fallback to unverified decoding under demo mode or missing credentials to prevent app crashes and facilitate seamless local testing.
+- Remove "How It Works" from the authenticated dashboard sidebar.
+- Build a beautiful, interactive, and actionable onboarding/checklist guide for new tenants with pristine workspaces (0 agents/logs) so the screen is never left completely blank, providing clear CTAs instead of forcing users to start from zero.
 
 ### Completed
 - **Resilient Firebase Auth Fallback**:
   - Enhanced `verify_firebase_id_token` in `backend/app/security/firebase_auth.py` to seamlessly catch signature verification errors (including `DefaultCredentialsError` or connection timeouts).
   - Wired `firebase_auth.py` to check `get_settings().demo_mode` and robustly fall back to unverified decoding for local sandbox evaluations when in demo mode or when GCP credentials are not set.
   - Successfully verified mock JWT verification via unit tests (8/8 backend tests passing cleanly).
+- **Interactive Onboarding Empty States**:
+  - **Dashboard (Security Console)**: Replaced empty dashboards for pristine workspaces (0 registered agents) with a premium setup checklist complete with badges, styled instruction rows, and immediate actionable CTA buttons linking to key views.
+  - **Agent Registry**: Added a premium empty state panel guiding users to "Deploy First Agent" with a single click.
+  - **Audit Ledger**: Created an interactive ledger empty state illustrating append-only SHA-256 chain concepts, including buttons to register agents or test threat simulation payloads.
+  - **Event Feed & Threats panels**: Embedded robust inline helper buttons and online active shield status badges when individual grids are empty.
+- **Sidebar Polish**:
+  - Removed "How It Works" from the authenticated app shell's Sidebar navigation.
 - **Backend Server Live Restart**:
   - Gracefully terminated the stale background FastAPI server task and restarted a fresh uvicorn instance on port `8000` to immediately pick up the updated token verification logic.
 
 ### Files Modified
 - `backend/app/security/firebase_auth.py` (Robust signature exception handling & demo-mode aware unverified JWT claims decode fallback)
+- `frontend/src/main.tsx` (Removed Sidebar "How It Works", added premium interactive empty-state onboarding, setup checklists, and actionable CTAs)
 - `HANDOFF.md` (Updated documentation pack)
 
 ---

@@ -893,7 +893,6 @@ function Sidebar({ active, setView, onLogout }: { active: string; setView: (v: s
     ["agents",   "Agents"],
     ["ledger",   "Ledger"],
     ["attack",   "Attack Sim"],
-    ["how-it-works", "How It Works"],
     ["settings", "Settings"],
   ] as const;
   return (
@@ -1040,33 +1039,94 @@ function Dashboard({ setView, data, onLogout }: { setView: (v:string)=>void; dat
         {data.error && <div className="app-error">{data.error}</div>}
         <div className="metrics">{metrics.map(m=><div key={m.l} className="metric"><span>{m.l}</span><strong>{m.v}</strong></div>)}</div>
         
-        <SecurityTelemetryChart ledger={data.ledger} threats={data.threats} />
+        {data.agents.length === 0 ? (
+          <div className="panel onboarding-panel" style={{ marginTop: "20px", padding: "30px", border: "1px solid rgba(212, 175, 55, 0.3)", borderRadius: "var(--r-md)", background: "linear-gradient(135deg, var(--bg-card) 0%, rgba(212, 175, 55, 0.05) 100%)" }}>
+            <div className="badge b-allowed" style={{ marginBottom: "16px", textTransform: "uppercase", fontSize: "10px", letterSpacing: "0.05em", fontWeight: 700 }}>Pristine Workspace</div>
+            <h2 style={{ fontSize: "20px", fontWeight: 800, color: "var(--ink)", marginBottom: "10px" }}>Welcome to your AgentShield Console</h2>
+            <p style={{ color: "var(--ink-70)", fontSize: "13.5px", lineHeight: "1.6", maxWidth: "680px", marginBottom: "28px" }}>
+              Secure, monitor, and audit your autonomous AI agents. Your workspace is currently empty. Follow these simple, actionable steps to deploy a protected agent, run security simulations, and inspect the tamper-proof ledger.
+            </p>
 
-        <div className="dash-grid">
-          <div className="panel">
-            <div className="panel__title">Event feed</div>
-            {data.ledger.length===0&&!data.loading&&<p className="app-hint">No events yet. Run an attack simulation to populate the ledger.</p>}
-            {data.ledger.slice().reverse().slice(0,8).map(e=>(
-              <div key={e.id} className={`event-row ev-${e.verdict.toLowerCase()}`}>
-                <span className={`badge b-${e.verdict.toLowerCase()}`}>{e.verdict}</span>
-                <span className="ev-agent">{agentName(data.agents,e.agent_id)}</span>
-                <span className="ev-type">{e.event_type}</span>
-                <span className="ev-id">#{e.id}</span>
+            <div className="onboarding-steps" style={{ display: "grid", gap: "20px", marginBottom: "32px" }}>
+              <div className="onboarding-step" style={{ display: "flex", gap: "16px", padding: "18px", background: "var(--bg-app)", border: "1px solid var(--line)", borderRadius: "var(--r-md)", transition: "border-color 0.2s" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "50%", background: "var(--ink)", color: "#fff", fontWeight: 700, fontSize: "14px", flexShrink: 0 }}>1</div>
+                <div style={{ flexGrow: 1 }}>
+                  <h4 style={{ fontSize: "14.5px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--ink)" }}>Register your first AI agent</h4>
+                  <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "var(--ink-60)", lineHeight: "1.5" }}>Generate cryptographic identity credentials (RS256 keypairs) to enforce tool access controls and track behavior metrics.</p>
+                  <button className="btn-primary btn-sm" onClick={() => setView("agents")}>Go to Agent Registry</button>
+                </div>
               </div>
-            ))}
-          </div>
-          <div className="panel">
-            <div className="panel__title">Threats</div>
-            {data.threats.length===0&&!data.loading&&<p className="app-hint">No threats detected yet.</p>}
-            {data.threats.slice().reverse().slice(0,6).map(t=>(
-              <div key={t.id} className="threat-row">
-                <span className="badge b-blocked">{t.attack_type.replace(/_/g," ")}</span>
-                <span className="ev-agent">{agentName(data.agents,t.agent_id)}</span>
-                <span className="threat-conf">{Math.round(t.confidence*100)}%</span>
+
+              <div className="onboarding-step" style={{ display: "flex", gap: "16px", padding: "18px", background: "var(--bg-app)", border: "1px solid var(--line)", borderRadius: "var(--r-md)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "50%", background: "var(--ink)", color: "#fff", fontWeight: 700, fontSize: "14px", flexShrink: 0 }}>2</div>
+                <div style={{ flexGrow: 1 }}>
+                  <h4 style={{ fontSize: "14.5px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--ink)" }}>Run a security simulation</h4>
+                  <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "var(--ink-60)", lineHeight: "1.5" }}>Simulate prompt injections, credential theft, and unauthorized tool executions to test AgentShield's defenses.</p>
+                  <button className="btn-primary btn-sm" onClick={() => setView("attack")}>Open Attack Simulator</button>
+                </div>
               </div>
-            ))}
+
+              <div className="onboarding-step" style={{ display: "flex", gap: "16px", padding: "18px", background: "var(--bg-app)", border: "1px solid var(--line)", borderRadius: "var(--r-md)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "50%", background: "var(--ink)", color: "#fff", fontWeight: 700, fontSize: "14px", flexShrink: 0 }}>3</div>
+                <div style={{ flexGrow: 1 }}>
+                  <h4 style={{ fontSize: "14.5px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--ink)" }}>Inspect the immutable ledger</h4>
+                  <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "var(--ink-60)", lineHeight: "1.5" }}>Verify the SHA-256 cryptographic chain hash linkages across all decisions to guarantee zero tempering.</p>
+                  <button className="btn-primary btn-sm" onClick={() => setView("ledger")}>Verify Audit Ledger</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="quick-integrate panel" style={{ background: "rgba(0,0,0,0.01)", border: "1px dashed var(--line)", padding: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--ink-80)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick Python SDK Integration</span>
+                <code style={{ fontSize: "11px", color: "var(--ink-60)" }}>v0.1.0</code>
+              </div>
+              <pre style={{ margin: 0, padding: "12px", background: "var(--bg-app)", border: "1px solid var(--line)", borderRadius: "var(--r-sm)", overflowX: "auto", fontSize: "12px", color: "var(--ink)" }}>
+                <code>pip install agentshield</code>
+              </pre>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <SecurityTelemetryChart ledger={data.ledger} threats={data.threats} />
+
+            <div className="dash-grid">
+              <div className="panel">
+                <div className="panel__title">Event feed</div>
+                {data.ledger.length === 0 && !data.loading && (
+                  <div style={{ textAlign: "center", padding: "30px 10px" }}>
+                    <p className="app-hint" style={{ marginBottom: "16px" }}>No decisions recorded on the cryptographic ledger yet.</p>
+                    <button className="btn-primary btn-sm" onClick={() => setView("attack")}>Test an Attack Payload</button>
+                  </div>
+                )}
+                {data.ledger.slice().reverse().slice(0,8).map(e=>(
+                  <div key={e.id} className={`event-row ev-${e.verdict.toLowerCase()}`}>
+                    <span className={`badge b-${e.verdict.toLowerCase()}`}>{e.verdict}</span>
+                    <span className="ev-agent">{agentName(data.agents,e.agent_id)}</span>
+                    <span className="ev-type">{e.event_type}</span>
+                    <span className="ev-id">#{e.id}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="panel">
+                <div className="panel__title">Threats</div>
+                {data.threats.length === 0 && !data.loading && (
+                  <div style={{ textAlign: "center", padding: "30px 10px" }}>
+                    <p className="app-hint" style={{ marginBottom: "16px" }}>Your active pattern protection shield is monitoring agent calls.</p>
+                    <span className="badge b-allowed" style={{ fontSize: "11px", fontWeight: 700 }}>Active Protection Online</span>
+                  </div>
+                )}
+                {data.threats.slice().reverse().slice(0,6).map(t=>(
+                  <div key={t.id} className="threat-row">
+                    <span className="badge b-blocked">{t.attack_type.replace(/_/g," ")}</span>
+                    <span className="ev-agent">{agentName(data.agents,t.agent_id)}</span>
+                    <span className="threat-conf">{Math.round(t.confidence*100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
@@ -1079,14 +1139,30 @@ function LedgerPage({ setView, data, verifyLedger, onLogout }: { setView:(v:stri
       <main className="app-main">
         <div className="app-topbar"><h1>Audit ledger</h1><button className="btn-primary btn-sm" onClick={()=>void verifyLedger()}>Verify chain</button></div>
         <div className={`verify-banner ${data.ledgerValid?"ok":""}`}>{data.ledgerValid===null?"Run verification to check chain integrity.":data.ledgerValid?`✓ Chain verified — ${data.ledger.length} entries, no tampering.`:"✗ Chain verification FAILED — possible tampering."}</div>
-        <div className="panel"><div style={{overflowX:"auto"}}>
-          <table className="app-table">
-            <thead><tr><th>ID</th><th>Agent</th><th>Type</th><th>Verdict</th><th>Hash</th><th>Prev</th></tr></thead>
-            <tbody>{data.ledger.map(r=>(
-              <tr key={r.id}><td>#{r.id}</td><td>{agentName(data.agents,r.agent_id)}</td><td>{r.event_type}</td><td><span className={`badge b-${r.verdict.toLowerCase()}`}>{r.verdict}</span></td><td><code>{fmtHash(r.curr_hash)}</code></td><td><code>{fmtHash(r.prev_hash)}</code></td></tr>
-            ))}</tbody>
-          </table>
-        </div></div>
+        <div className="panel">
+          {data.ledger.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: "36px", marginBottom: "16px" }}>🔒</div>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 8px 0", color: "var(--ink)" }}>Audit Ledger is Empty</h3>
+              <p className="app-hint" style={{ maxWidth: "480px", margin: "0 auto 24px auto", lineHeight: "1.5" }}>
+                All agent decisions are cryptographically signed and hash-chained in an append-only audit ledger. Run a threat simulation or deploy an agent to record the first transaction block.
+              </p>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <button className="btn-primary btn-sm" onClick={() => setView("agents")}>Register Agent</button>
+                <button className="btn-primary btn-sm" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)" }} onClick={() => setView("attack")}>Run Attack Sim</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{overflowX:"auto"}}>
+              <table className="app-table">
+                <thead><tr><th>ID</th><th>Agent</th><th>Type</th><th>Verdict</th><th>Hash</th><th>Prev</th></tr></thead>
+                <tbody>{data.ledger.map(r=>(
+                  <tr key={r.id}><td>#{r.id}</td><td>{agentName(data.agents,r.agent_id)}</td><td>{r.event_type}</td><td><span className={`badge b-${r.verdict.toLowerCase()}`}>{r.verdict}</span></td><td><code>{fmtHash(r.curr_hash)}</code></td><td><code>{fmtHash(r.prev_hash)}</code></td></tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -1137,14 +1213,27 @@ function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setV
           <button type="submit" className="btn-primary btn-sm">Create agent</button>
         </form>}
         {data.error && <div className="app-error">{data.error}</div>}
-        <div className="panel"><div style={{overflowX:"auto"}}>
-          <table className="app-table">
-            <thead><tr><th>Name</th><th>Type</th><th>Trust</th><th>Status</th><th></th></tr></thead>
-            <tbody>{data.agents.map(a=>(
-              <tr key={a.agent_id}><td>{a.name}</td><td>{a.type}</td><td>{a.trust_score.toFixed(2)}</td><td><span className={`badge b-${a.status==="revoked"?"blocked":"allowed"}`}>{a.status}</span></td><td><button className="revoke-btn" onClick={()=>void revokeAgent(a.agent_id)} disabled={a.status==="revoked"}>Revoke</button></td></tr>
-            ))}</tbody>
-          </table>
-        </div></div>
+        <div className="panel">
+          {data.agents.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: "36px", marginBottom: "16px" }}>🤖</div>
+              <h3 style={{ fontSize: "17px", fontWeight: 700, margin: "0 0 8px 0", color: "var(--ink)" }}>No Protected Agents Registered</h3>
+              <p className="app-hint" style={{ maxWidth: "480px", margin: "0 auto 24px auto", lineHeight: "1.5" }}>
+                Add your autonomous AI agents to the secure registry. Once registered, they will receive cryptographic keys for authenticating prompt evaluations and tool execution gates.
+              </p>
+              <button className="btn-primary btn-md" style={{ padding: "10px 20px" }} onClick={() => setShow(true)}>Deploy First Agent</button>
+            </div>
+          ) : (
+            <div style={{overflowX:"auto"}}>
+              <table className="app-table">
+                <thead><tr><th>Name</th><th>Type</th><th>Trust</th><th>Status</th><th></th></tr></thead>
+                <tbody>{data.agents.map(a=>(
+                  <tr key={a.agent_id}><td>{a.name}</td><td>{a.type}</td><td>{a.trust_score.toFixed(2)}</td><td><span className={`badge b-${a.status==="revoked"?"blocked":"allowed"}`}>{a.status}</span></td><td><button className="revoke-btn" onClick={()=>void revokeAgent(a.agent_id)} disabled={a.status==="revoked"}>Revoke</button></td></tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
