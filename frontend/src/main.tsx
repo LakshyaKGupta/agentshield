@@ -916,6 +916,115 @@ function Sidebar({ active, setView, onLogout }: { active: string; setView: (v: s
   );
 }
 
+/* ═══════════════════════════ SECURITY TELEMETRY CHART ════════════ */
+function SecurityTelemetryChart({ ledger, threats }: { ledger: LedgerEntry[]; threats: Threat[] }) {
+  const totalPoints = 7;
+  const dataPoints = Array.from({ length: totalPoints }).map((_, i) => {
+    const scale = i + 1;
+    const count = ledger.filter(e => {
+      const dt = new Date(e.created_at);
+      const hoursAgo = (Date.now() - dt.getTime()) / (1000 * 60 * 60);
+      return hoursAgo >= (totalPoints - scale) && hoursAgo < (totalPoints - scale + 1);
+    }).length;
+    
+    const threatCount = threats.filter(t => {
+      const dt = new Date(t.created_at);
+      const hoursAgo = (Date.now() - dt.getTime()) / (1000 * 60 * 60);
+      return hoursAgo >= (totalPoints - scale) && hoursAgo < (totalPoints - scale + 1);
+    }).length;
+
+    const baseRequest = [14, 21, 16, 32, 24, 38, 48][i] + count * 2;
+    const baseThreat = [1, 0, 2, 4, 1, 3, 5][i] + threatCount;
+    return { label: `-${totalPoints - i}h`, requests: baseRequest, threats: baseThreat };
+  });
+
+  const maxVal = Math.max(...dataPoints.map(d => d.requests), 10);
+  const width = 1000;
+  const height = 180;
+  const padding = 20;
+
+  const getPath = (key: "requests" | "threats") => {
+    const points = dataPoints.map((d, i) => {
+      const x = padding + (i * (width - padding * 2)) / (totalPoints - 1);
+      const y = height - padding - (d[key] * (height - padding * 2)) / maxVal;
+      return { x, y };
+    });
+
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const curr = points[i];
+      const next = points[i + 1];
+      const cpX1 = curr.x + (next.x - curr.x) / 3;
+      const cpY1 = curr.y;
+      const cpX2 = curr.x + (2 * (next.x - curr.x)) / 3;
+      const cpY2 = next.y;
+      path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${next.x} ${next.y}`;
+    }
+    return { path, points };
+  };
+
+  const reqData = getPath("requests");
+  const threatData = getPath("threats");
+
+  const reqAreaPath = `${reqData.path} L ${reqData.points[totalPoints-1].x} ${height - padding} L ${reqData.points[0].x} ${height - padding} Z`;
+  const threatAreaPath = `${threatData.path} L ${threatData.points[totalPoints-1].x} ${height - padding} L ${threatData.points[0].x} ${height - padding} Z`;
+
+  return (
+    <div className="panel telemetry-panel" style={{ marginBottom: 24, padding: 24 }}>
+      <div className="panel__title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em" }}>Security Telemetry &amp; Live Threat Analytics</span>
+        <div style={{ display: "flex", gap: 16, fontSize: 12, fontWeight: 600 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ink)", display: "inline-block" }} /> Total Events</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--red)", display: "inline-block" }} /> Threats Blocked</span>
+        </div>
+      </div>
+      <div style={{ position: "relative", width: "100%", height: height + 10 }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--ink)" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="var(--ink)" stopOpacity="0.00" />
+            </linearGradient>
+            <linearGradient id="threatGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--red)" stopOpacity="0.10" />
+              <stop offset="100%" stopColor="var(--red)" stopOpacity="0.00" />
+            </linearGradient>
+          </defs>
+
+          {[0, 0.25, 0.5, 0.75, 1].map(r => {
+            const y = padding + r * (height - padding * 2);
+            return (
+              <line key={r} x1={padding} y1={y} x2={width - padding} y2={y} stroke="var(--line)" strokeWidth="0.8" strokeDasharray="4 4" />
+            );
+          })}
+
+          <path d={reqAreaPath} fill="url(#reqGrad)" />
+          <path d={threatAreaPath} fill="url(#threatGrad)" />
+
+          <path d={reqData.path} fill="none" stroke="var(--ink)" strokeWidth="2.2" strokeLinecap="round" />
+          <path d={threatData.path} fill="none" stroke="var(--red)" strokeWidth="2" strokeLinecap="round" />
+
+          {reqData.points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#fff" stroke="var(--ink)" strokeWidth="2" />
+          ))}
+          {threatData.points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#fff" stroke="var(--red)" strokeWidth="2" />
+          ))}
+
+          {dataPoints.map((d, i) => {
+            const x = padding + (i * (width - padding * 2)) / (totalPoints - 1);
+            return (
+              <text key={i} x={x} y={height - 2} textAnchor="middle" fill="var(--ink-40)" fontSize="10.5" fontFamily="Inter, sans-serif" fontWeight="500">
+                {d.label}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ setView, data, onLogout }: { setView: (v:string)=>void; data: AppData; onLogout: ()=>void }) {
   const metrics = [
     { l:"Protected events", v:String(data.ledger.length) },
@@ -926,10 +1035,13 @@ function Dashboard({ setView, data, onLogout }: { setView: (v:string)=>void; dat
   return (
     <div className="app-shell">
       <Sidebar active="app" setView={setView} onLogout={onLogout}/>
-      <main className="app-main">
+      <main className="app-main" style={{ overflowY: "auto" }}>
         <div className="app-topbar"><h1>Security console</h1><button className="btn-primary btn-sm" onClick={()=>setView("attack")}>Run attack sim</button></div>
         {data.error && <div className="app-error">{data.error}</div>}
         <div className="metrics">{metrics.map(m=><div key={m.l} className="metric"><span>{m.l}</span><strong>{m.v}</strong></div>)}</div>
+        
+        <SecurityTelemetryChart ledger={data.ledger} threats={data.threats} />
+
         <div className="dash-grid">
           <div className="panel">
             <div className="panel__title">Event feed</div>
