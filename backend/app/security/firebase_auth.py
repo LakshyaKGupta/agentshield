@@ -64,7 +64,9 @@ def verify_firebase_id_token(id_token: str) -> dict:
         global _firebase_app
         if _firebase_app is None:
             try:
-                _firebase_app = firebase_admin.initialize_app()
+                if "GOOGLE_CLOUD_PROJECT" not in os.environ:
+                    os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+                _firebase_app = firebase_admin.initialize_app(options={"projectId": project_id})
             except ValueError:
                 _firebase_app = firebase_admin.get_app()
         try:
