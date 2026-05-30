@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 /**
  * HeroWave — 3-layer animated sea wave, Handhold.io style.
