@@ -231,9 +231,22 @@ function HandholdChat() {
   const [focused, setFocused]   = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
+  const wrapRef   = useRef<HTMLDivElement>(null);
 
   // Show chips only when focused or actively chatting
   const showChips = focused || msgs.length > 0;
+
+  // ── Click outside → collapse ──────────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+        setFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -261,11 +274,34 @@ function HandholdChat() {
     }
   };
 
+  const clearChat = () => {
+    setMsgs([]);
+    setExpanded(false);
+  };
+
   return (
-    <div className={`hchat${expanded ? " hchat--expanded" : ""}`} role="complementary" aria-label="AgentShield assistant">
+    <div ref={wrapRef} className={`hchat${expanded ? " hchat--expanded" : ""}`} role="complementary" aria-label="AgentShield assistant">
       {/* Message history — grows above the card */}
       {expanded && (
         <div className="hchat__history">
+          {/* History header with clear button */}
+          {msgs.length > 0 && (
+            <div className="hchat__history-header">
+              <span className="hchat__history-title">AgentShield Assistant</span>
+              <button
+                className="hchat__clear"
+                onMouseDown={e => e.preventDefault()}
+                onClick={clearChat}
+                aria-label="Clear chat"
+                title="Clear conversation"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+          )}
           {msgs.map((m, i) => (
             <div key={i} className={`hchat-msg hchat-msg--${m.role}`}>
               {m.role === "bot" && (
@@ -323,11 +359,11 @@ function HandholdChat() {
             onChange={e => setInput(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }}
           />
           <button
             className={`hchat__send${input.trim() ? " hchat__send--active" : ""}`}
-            onClick={() => send(input)}
+            onClick={() => void send(input)}
             aria-label="Send"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

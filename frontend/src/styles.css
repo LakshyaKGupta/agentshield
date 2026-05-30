@@ -739,6 +739,51 @@ ul, ol { list-style: none; }
 .hchat__history::-webkit-scrollbar-track { background: transparent; }
 .hchat__history::-webkit-scrollbar-thumb { background: rgba(0,0,0,.1); border-radius: 99px; }
 
+/* ── History header: title + clear button ──────────────────────── */
+.hchat__history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  margin-bottom: 2px;
+  position: sticky;
+  top: 0;
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(8px);
+  z-index: 1;
+}
+.hchat__history-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: rgba(17,17,17,.4);
+}
+.hchat__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(17,17,17,.45);
+  border: 1px solid rgba(0,0,0,.08);
+  background: transparent;
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+}
+.hchat__clear:hover {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.hchat__clear:active {
+  transform: scale(0.95);
+}
+
+
 /* ── Individual messages ───────────────────────────────────────── */
 .hchat-msg {
   display: flex;
