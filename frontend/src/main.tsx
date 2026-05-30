@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import HeroOrb from "./HeroOrb";
+import Hero from "./Hero";
 import {
   auth, googleProvider, isFirebaseConfigured,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup,
@@ -373,83 +373,7 @@ function HeroChatBar({ setView }: { setView: (v: string) => void }) {
 }
 
 /* ═══════════════════════════ HERO ═══════════════════════════════ */
-function Hero({ setView }: { setView: (v: string) => void }) {
-  const eyebrowRef = useRef<HTMLDivElement>(null);
-  const h1Ref      = useRef<HTMLHeadingElement>(null);
-  const subRef     = useRef<HTMLParagraphElement>(null);
-  const ctaRef     = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Staggered mount animation — exactly like Handhold.io
-    [
-      [eyebrowRef.current, 140],
-      [h1Ref.current,      280],
-      [subRef.current,     400],
-      [ctaRef.current,     520],
-    ].forEach(([el, delay]) => {
-      const e = el as HTMLElement | null;
-      if (!e) return;
-      setTimeout(() => requestAnimationFrame(() => {
-        e.style.transition = `opacity 700ms cubic-bezier(.16,1,.3,1), transform 700ms cubic-bezier(.16,1,.3,1)`;
-        e.style.opacity = "1";
-        e.style.transform = "translateY(0)";
-      }), delay as number);
-    });
-  }, []);
-
-  const LOGOS = ["Acme AI","NeuralOps","FlowLabs","Axiom","Synthex","DataMesh","CoreAI","PulseML","Vertex","Echo AI"];
-
-  return (
-    <section className="hero" aria-label="Hero">
-      {/* Wave canvas — subtle, cream-toned */}
-      <div className="hero__canvas"><HeroOrb /></div>
-
-      {/* Main copy */}
-      <div className="hero__body">
-        <div ref={eyebrowRef} style={{ opacity: 0, transform: "translateY(14px)", willChange: "opacity, transform" }}>
-          <span className="hero__chip">
-            <span className="hero__chip-dot" />
-            Deterministic AI agent security
-          </span>
-        </div>
-
-        <h1 ref={h1Ref} className="hero__h1"
-          style={{ opacity: 0, transform: "translateY(14px)", willChange: "opacity, transform" }}>
-          The security layer<br/>every <em>AI agent</em> needs
-        </h1>
-
-        <p ref={subRef} className="hero__sub"
-          style={{ opacity: 0, transform: "translateY(14px)", willChange: "opacity, transform" }}>
-          Identity verification, permission enforcement, and tamper-evident audit — synchronous protection on every message and tool call.
-        </p>
-
-        <div ref={ctaRef} className="hero__cta"
-          style={{ opacity: 0, transform: "translateY(14px)", willChange: "opacity, transform" }}>
-          <button className="btn-primary btn-lg" onClick={() => setView("signup")}>
-            Create workspace
-          </button>
-          <button className="btn-ghost" onClick={() => setView("product")}>
-            See how it works →
-          </button>
-        </div>
-      </div>
-
-      {/* Logo ticker strip */}
-      <div className="ticker-wrap">
-        <div className="ticker">
-          <div className="ticker__inner">
-            {[...Array(2)].flatMap(() => LOGOS.map((n, i) => (
-              <span key={`${n}-${i}`}>{n}</span>
-            )))}
-          </div>
-        </div>
-      </div>
-
-      {/* Chat input — Handhold.io style */}
-      <HeroChatBar setView={setView} />
-    </section>
-  );
-}
+/* Hero is now imported from Hero.tsx */
 
 /* ═══════════════════════════ SECTION 1: STATS ══════════════════ */
 function StatsSection() {
