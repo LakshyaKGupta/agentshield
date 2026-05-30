@@ -1215,6 +1215,8 @@ function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setV
   const [type, setType]   = useState("research_agent");
   const [tool, setTool]   = useState("web_search");
   const [action, setAction] = useState("read");
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+
   return (
     <div className="app-shell">
       <Sidebar active="agents" setView={setView} onLogout={onLogout}/>
@@ -1243,39 +1245,384 @@ function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setV
           ) : (
             <div style={{overflowX:"auto"}}>
               <table className="app-table">
-                <thead><tr><th>Name</th><th>Type</th><th>Trust</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Name</th><th>Type</th><th>Trust</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>{data.agents.map(a=>(
-                  <tr key={a.agent_id}><td>{a.name}</td><td>{a.type}</td><td>{a.trust_score.toFixed(2)}</td><td><span className={`badge b-${a.status==="revoked"?"blocked":"allowed"}`}>{a.status}</span></td><td><button className="revoke-btn" onClick={()=>void revokeAgent(a.agent_id)} disabled={a.status==="revoked"}>Revoke</button></td></tr>
+                  <tr key={a.agent_id}>
+                    <td>{a.name}</td>
+                    <td>{a.type}</td>
+                    <td>{a.trust_score.toFixed(2)}</td>
+                    <td><span className={`badge b-${a.status==="revoked"?"blocked":"allowed"}`}>{a.status}</span></td>
+                    <td style={{ display: "flex", gap: 10 }}>
+                      <button className="revoke-btn" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)", borderRadius: "var(--r-xs)", padding: "4px 10px" }} onClick={() => setSelectedAgentId(a.agent_id)}>
+                        View Behavior
+                      </button>
+                      <button className="revoke-btn" onClick={()=>void revokeAgent(a.agent_id)} disabled={a.status==="revoked"}>
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
                 ))}</tbody>
               </table>
             </div>
           )}
         </div>
+
+        {selectedAgentId && (
+          <AgentRiskModal
+            agentId={selectedAgentId}
+            apiKey={data.apiKey}
+            onClose={() => setSelectedAgentId(null)}
+            onRevoke={() => void revokeAgent(selectedAgentId)}
+          />
+        )}
       </main>
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════ AGENT RISK DRAWER ══════════════════ */
+type AgentBehavior = {
+  agent_id: string;
+  name: string;
+  trust_score: number;
+  risk_score: number;
+  risk_profile: string;
+  threat_counts: Record<string, number>;
+  trust_history: Array<{ timestamp: string; score: number; delta: number; reason: string }>;
+};
+
+function AgentRiskModal({ agentId, apiKey, onClose, onRevoke }: { agentId: string; apiKey: string; onClose: () => void; onRevoke: () => void }) {
+  const [behavior, setBehavior] = useState<AgentBehavior | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [rotatedToken, setRotatedToken] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const loadBehavior = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await requestJson<AgentBehavior>(`/v1/agents/${agentId}/behavior`, apiKey);
+      setBehavior(res);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [agentId, apiKey]);
+
+  useEffect(() => {
+    void loadBehavior();
+  }, [loadBehavior]);
+
+  const rotateToken = async () => {
+    if (!confirm("Are you sure you want to rotate the agent signature token? Active instances will need the new token to sign requests.")) return;
+    try {
+      const res = await requestJson<any>(`/v1/agents/${agentId}/rotate-token`, apiKey, { method: "POST" });
+      setRotatedToken(res.token);
+      void loadBehavior();
+    } catch (err) {
+      alert("Failed to rotate token.");
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (!rotatedToken) return;
+    void navigator.clipboard.writeText(rotatedToken);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="risk-modal-overlay" onClick={onClose}>
+        <div className="risk-modal" onClick={e => e.stopPropagation()}>
+          <div className="risk-modal-header">
+            <h3>Behavioral Analysis</h3>
+            <button className="risk-modal-close" onClick={onClose}>&times;</button>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px" }}>
+            <span className="spin" style={{ width: 30, height: 30, border: "2.5px solid var(--ink)", borderTopColor: "transparent" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!behavior) return null;
+
+  const renderSparkline = () => {
+    const history = behavior.trust_history || [];
+    if (history.length < 1) return null;
+    const width = 500;
+    const height = 120;
+    const padding = 15;
+    const points = history.map((pt, index) => {
+      const x = padding + (index / (Math.max(1, history.length - 1))) * (width - 2 * padding);
+      const y = height - (padding + pt.score * (height - 2 * padding));
+      return { x, y };
+    });
+    
+    const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    
+    return (
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ background: "var(--bg-alt)", borderRadius: "var(--r-md)", padding: "10px", marginTop: "10px" }}>
+        <path d={path} fill="none" stroke="var(--ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="4" fill={history[i].delta < 0 ? "var(--red)" : "var(--green)"} />
+        ))}
+      </svg>
+    );
+  };
+
+  const profileColor = behavior.risk_profile === "Safe" ? "var(--green)" : behavior.risk_profile === "Guarded" ? "var(--amber)" : "var(--red)";
+  const profileBadgeClass = behavior.risk_profile === "Safe" ? "b-allowed" : behavior.risk_profile === "Guarded" ? "b-flagged" : "b-blocked";
+
+  return (
+    <div className="risk-modal-overlay" onClick={onClose}>
+      <div className="risk-modal" onClick={e => e.stopPropagation()}>
+        <div className="risk-modal-header">
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800 }}>{behavior.name}</h2>
+            <span className="app-hint" style={{ fontSize: 12 }}>ID: {behavior.agent_id}</span>
+          </div>
+          <button className="risk-modal-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="trust-score-hero">
+          <div className="trust-score-circle">
+            <svg className="trust-score-ring">
+              <circle cx="45" cy="45" r="38" stroke="var(--line)" strokeWidth="8" fill="transparent" />
+              <circle cx="45" cy="45" r="38" stroke={profileColor} strokeWidth="8" fill="transparent"
+                strokeDasharray={`${2 * Math.PI * 38}`}
+                strokeDashoffset={`${2 * Math.PI * 38 * (1 - behavior.trust_score)}`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="trust-score-value">{Math.round(behavior.trust_score * 100)}%</span>
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span className={`badge ${profileBadgeClass}`} style={{ fontSize: 11, fontWeight: 700 }}>{behavior.risk_profile}</span>
+            </div>
+            <p className="app-hint" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Calculated real-time integrity and trust index. Threat overrides decrease index dynamically.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Historical Trust Index</h3>
+          <p className="app-hint" style={{ fontSize: 12, marginBottom: 12 }}>Audit ledger verification sparkline timeline.</p>
+          {renderSparkline()}
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Threat Attack Matrix</h3>
+          <p className="app-hint" style={{ fontSize: 12, marginBottom: 12 }}>Specific payload classification blocked counters.</p>
+          <div className="threat-matrix-grid">
+            {Object.entries(behavior.threat_counts || {}).map(([key, value]) => (
+              <div key={key} className={`threat-matrix-card${value > 0 ? " has-threats" : ""}`}>
+                <span className="threat-matrix-label">{key.replace(/_/g, " ")}</span>
+                <span className="threat-matrix-count">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {rotatedToken && (
+          <div className="panel" style={{ background: "var(--bg-alt)", border: "1px solid var(--line)" }}>
+            <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Rotated Agent Token</h4>
+            <p className="app-hint" style={{ fontSize: 11, marginBottom: 10 }}>Copy and configure this new token inside your agent environment.</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" className="settings-input" readOnly value={rotatedToken} style={{ fontFamily: "monospace", fontSize: 12, width: "100%" }} />
+              <button className="btn-primary btn-sm" onClick={copyToClipboard}>
+                {copySuccess ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 12, marginTop: "auto", borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+          <button className="btn-primary" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)", flex: 1 }} onClick={rotateToken}>
+            Rotate Token
+          </button>
+          <button className="btn-primary" style={{ background: "var(--red)", borderColor: "var(--red)", flex: 1 }} onClick={() => { if (confirm("Revoking this agent will permanently invalidate all active authorization tokens. Proceed?")) { void onRevoke(); onClose(); } }}>
+            Revoke Agent
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ═══════════════════════════ SETTINGS PAGE ══════════════════════ */
 function SettingsPage({ setView, onLogout }: { setView:(v:string)=>void; onLogout:()=>void }) {
+  const [activeTab, setActiveTab] = useState<"general" | "cryptography" | "webhooks" | "team" >("general");
+  
   const [theme,     setTheme]     = useState("light");
   const [notifs,    setNotifs]    = useState(true);
   const [ttl,       setTtl]       = useState(3600);
   const [retention, setRetention] = useState(30);
-  const [saved,     setSaved]     = useState(false);
+  
+  const [keys, setKeys] = useState<any[]>([]);
+  const [keysLoading, setKeysLoading] = useState(false);
+  
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [webhookSaved, setWebhookSaved] = useState(false);
+  const [webhookSuccessMsg, setWebhookSuccessMsg] = useState("");
+  const [copySuccess, setCopySuccess] = useState(false);
+  
+  const [team, setTeam] = useState<{members: any[], invitations: any[]}>({members: [], invitations: []});
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("editor");
+  
+  const [saved, setSaved] = useState(false);
 
-  const save = async () => {
-    const apiKey = localStorage.getItem("as_key");
+  const apiKey = localStorage.getItem("as_key") || "";
+
+  const loadSettings = useCallback(async () => {
     if (!apiKey) return;
     try {
-      await fetch(`${BACKEND_URL}/v1/settings`, {
+      const res = await requestJson<any>("/v1/settings", apiKey);
+      setTheme(res.theme || "light");
+      setNotifs(res.notifications_enabled !== false);
+      setTtl(res.default_agent_ttl || 3600);
+      setRetention(res.audit_retention_days || 30);
+      setWebhookUrl(res.webhook_url || "");
+      setWebhookSecret(res.webhook_secret || "");
+    } catch { /* offline */ }
+  }, [apiKey]);
+
+  const loadKeys = useCallback(async () => {
+    if (!apiKey) return;
+    setKeysLoading(true);
+    try {
+      const res = await requestJson<any[]>("/v1/keys", apiKey);
+      setKeys(res);
+    } catch { /* offline */ }
+    finally { setKeysLoading(false); }
+  }, [apiKey]);
+
+  const loadTeam = useCallback(async () => {
+    if (!apiKey) return;
+    setTeamLoading(true);
+    try {
+      const res = await requestJson<any>("/v1/team/members", apiKey);
+      setTeam(res);
+    } catch { /* offline */ }
+    finally { setTeamLoading(false); }
+  }, [apiKey]);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
+
+  useEffect(() => {
+    if (activeTab === "cryptography") void loadKeys();
+    if (activeTab === "team") void loadTeam();
+  }, [activeTab, loadKeys, loadTeam]);
+
+  const saveGeneral = async () => {
+    try {
+      await requestJson("/v1/settings", apiKey, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "X-AgentShield-API-Key": apiKey },
-        body: JSON.stringify({ theme, notifications_enabled: notifs, default_agent_ttl: ttl, audit_retention_days: retention, language: "en" }),
+        body: JSON.stringify({
+          theme,
+          notifications_enabled: notifs,
+          default_agent_ttl: ttl,
+          audit_retention_days: retention,
+          language: "en",
+          webhook_url: webhookUrl
+        }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { /* offline */ }
+    } catch { /* error */ }
+  };
+
+  const saveWebhook = async () => {
+    try {
+      await requestJson("/v1/settings", apiKey, {
+        method: "PUT",
+        body: JSON.stringify({
+          theme,
+          notifications_enabled: notifs,
+          default_agent_ttl: ttl,
+          audit_retention_days: retention,
+          language: "en",
+          webhook_url: webhookUrl
+        }),
+      });
+      setWebhookSaved(true);
+      setWebhookSuccessMsg("Webhook settings successfully saved.");
+      setTimeout(() => { setWebhookSaved(false); setWebhookSuccessMsg(""); }, 2500);
+      void loadSettings();
+    } catch { /* error */ }
+  };
+
+  const testWebhook = async () => {
+    try {
+      await requestJson("/v1/settings/webhooks/test", apiKey, { method: "POST" });
+      setWebhookSaved(true);
+      setWebhookSuccessMsg("Test webhook simulation successfully dispatched!");
+      setTimeout(() => { setWebhookSaved(false); setWebhookSuccessMsg(""); }, 3000);
+    } catch (err: any) {
+      alert(err.message || "Failed to trigger test webhook.");
+    }
+  };
+
+  const rotateKeys = async () => {
+    if (!confirm("Are you sure you want to rotate your RSA signing keypair? Old keys will be moved to rotated status.")) return;
+    try {
+      const res = await requestJson<any[]>("/v1/keys/rotate", apiKey, { method: "POST" });
+      setKeys(res);
+      alert("Signing keypair successfully rotated! New tokens will sign using the active credentials.");
+    } catch {
+      alert("Failed to rotate keypair.");
+    }
+  };
+
+  const inviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await requestJson("/v1/team/members", apiKey, {
+        method: "POST",
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole })
+      });
+      setShowInviteModal(false);
+      setInviteEmail("");
+      void loadTeam();
+    } catch (err: any) {
+      alert(err.message || "Failed to send invitation.");
+    }
+  };
+
+  const simulateAccept = async (id: string) => {
+    try {
+      await requestJson(`/v1/team/invitations/${id}/accept`, apiKey, { method: "POST" });
+      void loadTeam();
+    } catch {
+      alert("Failed to accept invitation.");
+    }
+  };
+
+  const removeMember = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this member or invitation?")) return;
+    try {
+      await requestJson(`/v1/team/members/${id}`, apiKey, { method: "DELETE" });
+      void loadTeam();
+    } catch (err: any) {
+      alert(err.message || "Failed to remove member.");
+    }
+  };
+
+  const copySecret = () => {
+    void navigator.clipboard.writeText(webhookSecret);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
   };
 
   return (
@@ -1283,75 +1630,260 @@ function SettingsPage({ setView, onLogout }: { setView:(v:string)=>void; onLogou
       <Sidebar active="settings" setView={setView} onLogout={onLogout}/>
       <main className="app-main">
         <div className="app-topbar"><h1>Settings &amp; Personalization</h1></div>
-        <div className="settings-grid">
-          {/* Appearance */}
-          <div className="panel settings-panel">
-            <div className="panel__title">Appearance</div>
-            <div className="settings-row">
-              <label className="settings-label">Theme</label>
-              <div className="settings-toggle-group">
-                {["light","dark","system"].map(t => (
-                  <button key={t} className={`settings-toggle${theme===t?" active":""}`} onClick={() => setTheme(t)}>
-                    {t.charAt(0).toUpperCase()+t.slice(1)}
-                  </button>
-                ))}
+        
+        <div className="settings-tabs">
+          {[
+            { id: "general", label: "General Settings" },
+            { id: "cryptography", label: "Cryptographic Vault" },
+            { id: "webhooks", label: "Webhook Alerts" },
+            { id: "team", label: "Team Directory" }
+          ].map(t => (
+            <button key={t.id} className={`settings-tab${activeTab === t.id ? " active" : ""}`} onClick={() => setActiveTab(t.id as any)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "general" && (
+          <div className="settings-grid">
+            <div className="panel settings-panel">
+              <div className="panel__title">Appearance</div>
+              <div className="settings-row">
+                <label className="settings-label">Theme</label>
+                <div className="settings-toggle-group">
+                  {["light","dark","system"].map(t => (
+                    <button key={t} className={`settings-toggle${theme===t?" active":""}`} onClick={() => setTheme(t)}>
+                      {t.charAt(0).toUpperCase()+t.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Notifications */}
-          <div className="panel settings-panel">
-            <div className="panel__title">Notifications</div>
-            <div className="settings-row">
-              <label className="settings-label">Security alerts</label>
-              <button
-                className={`settings-switch${notifs?" on":""}`}
-                onClick={() => setNotifs(n => !n)}
-                aria-checked={notifs}
-                role="switch"
-              >
-                <span className="settings-switch__thumb"/>
+            <div className="panel settings-panel">
+              <div className="panel__title">Notifications</div>
+              <div className="settings-row">
+                <label className="settings-label">Security alerts</label>
+                <button
+                  className={`settings-switch${notifs?" on":""}`}
+                  onClick={() => setNotifs(n => !n)}
+                  aria-checked={notifs}
+                  role="switch"
+                >
+                  <span className="settings-switch__thumb"/>
+                </button>
+              </div>
+            </div>
+
+            <div className="panel settings-panel">
+              <div className="panel__title">Agent Defaults</div>
+              <div className="settings-row">
+                <label className="settings-label">Default token TTL (seconds)</label>
+                <input
+                  type="number" min={60} max={86400} step={60}
+                  className="settings-input"
+                  value={ttl}
+                  onChange={e => setTtl(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="panel settings-panel">
+              <div className="panel__title">Audit &amp; Compliance</div>
+              <div className="settings-row">
+                <label className="settings-label">Ledger retention (days)</label>
+                <input
+                  type="number" min={1} max={365}
+                  className="settings-input"
+                  value={retention}
+                  onChange={e => setRetention(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            
+            <div className="settings-footer" style={{ gridColumn: "1 / -1", marginTop: 20 }}>
+              <button className="btn-primary" onClick={saveGeneral}>Save changes</button>
+              {saved && <span className="settings-saved">Changes saved</span>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "cryptography" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Workspace Key Management</h3>
+                <p className="app-hint" style={{ fontSize: 13 }}>Rotate RSA-2048 signing keys. Active keys authenticate client agent identity.</p>
+              </div>
+              <button className="btn-primary" onClick={rotateKeys}>Rotate Key Pair</button>
+            </div>
+
+            {keysLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "40px" }}><span className="spin" style={{ width: 24, height: 24, border: "2.5px solid var(--ink)", borderTopColor: "transparent" }} /></div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+                {keys.map(k => (
+                  <div key={k.id} className="key-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="badge b-allowed" style={{ textTransform: "uppercase", fontSize: 10, letterSpacing: "0.05em", background: k.status === "active" ? "var(--green)" : "var(--ink-40)" }}>{k.status}</span>
+                      <span className="app-hint" style={{ fontSize: 11 }}>{new Date(k.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <h4 style={{ fontSize: 13.5, fontWeight: 700 }}>Public Cryptographic Key Fingerprint</h4>
+                    <pre className="key-fingerprint">
+                      {k.public_key.trim().split("\n").slice(1, -1).join("").slice(0, 48)}...
+                    </pre>
+                    {k.rotated_at && (
+                      <span className="app-hint" style={{ fontSize: 11, fontStyle: "italic" }}>Rotated at: {new Date(k.rotated_at).toLocaleString()}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "webhooks" && (
+          <div className="settings-grid" style={{ gridTemplateColumns: "1fr" }}>
+            <div className="panel settings-panel">
+              <div className="panel__title">Real-Time Webhook Configuration</div>
+              
+              <div className="settings-row" style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                <label className="settings-label" style={{ marginBottom: 0 }}>Webhook Target URL</label>
+                <input
+                  type="url"
+                  className="settings-input"
+                  placeholder="https://yourdomain.com/webhooks/security"
+                  value={webhookUrl}
+                  style={{ width: "100%", maxWidth: "100%" }}
+                  onChange={e => setWebhookUrl(e.target.value)}
+                />
+              </div>
+
+              {webhookSecret && (
+                <div style={{ marginTop: 24 }}>
+                  <label className="settings-label">Cryptographic Signing Secret</label>
+                  <p className="app-hint" style={{ fontSize: 12, marginBottom: 8 }}>Used to calculate HMAC-SHA256 signatures passed in `X-AgentShield-Signature` header.</p>
+                  <div className="webhook-secret-box">
+                    <span className="webhook-secret-text">{webhookSecret}</span>
+                    <button className="code-copy-btn" onClick={copySecret}>
+                      {copySuccess ? "Copied" : "Copy secret"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+              <button className="btn-primary" onClick={saveWebhook}>Save Webhook</button>
+              <button className="btn-primary" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)" }} onClick={testWebhook}>
+                Trigger Test Webhook
               </button>
             </div>
+            {webhookSaved && (
+              <span className="settings-saved" style={{ marginTop: 12, display: "block" }}>{webhookSuccessMsg}</span>
+            )}
           </div>
+        )}
 
-          {/* Agent defaults */}
-          <div className="panel settings-panel">
-            <div className="panel__title">Agent Defaults</div>
-            <div className="settings-row">
-              <label className="settings-label">Default token TTL (seconds)</label>
-              <input
-                type="number" min={60} max={86400} step={60}
-                className="settings-input"
-                value={ttl}
-                onChange={e => setTtl(Number(e.target.value))}
-              />
+        {activeTab === "team" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Workspace Access Control Directory</h3>
+                <p className="app-hint" style={{ fontSize: 13 }}>List and invite workspace users. RBAC controls govern directory permissions.</p>
+              </div>
+              <button className="btn-primary" onClick={() => setShowInviteModal(true)}>Invite Team Member</button>
             </div>
-          </div>
 
-          {/* Audit */}
-          <div className="panel settings-panel">
-            <div className="panel__title">Audit &amp; Compliance</div>
-            <div className="settings-row">
-              <label className="settings-label">Ledger retention (days)</label>
-              <input
-                type="number" min={1} max={365}
-                className="settings-input"
-                value={retention}
-                onChange={e => setRetention(Number(e.target.value))}
-              />
-            </div>
-          </div>
-        </div>
+            {teamLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "40px" }}><span className="spin" style={{ width: 24, height: 24, border: "2.5px solid var(--ink)", borderTopColor: "transparent" }} /></div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Active Members</h4>
+                  <div className="team-grid">
+                    {team.members.map(m => (
+                      <div key={m.id} className="member-card">
+                        <div className="member-info">
+                          <span className="member-email">{m.email}</span>
+                          <span className="member-role">{m.role}</span>
+                        </div>
+                        <button className="revoke-btn" style={{ color: "var(--red)" }} onClick={() => removeMember(m.id)}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-        <div className="settings-footer">
-          <button className="btn-primary" onClick={save}>Save changes</button>
-          {saved && <span className="settings-saved">Changes saved</span>}
-        </div>
+                {team.invitations && team.invitations.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Pending Workspace Invitations</h4>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="app-table">
+                        <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Verification Helpers (Dev Mode)</th><th>Actions</th></tr></thead>
+                        <tbody>
+                          {team.invitations.map(inv => (
+                            <tr key={inv.id}>
+                              <td>{inv.email}</td>
+                              <td><span className="member-role" style={{ fontSize: 11 }}>{inv.role}</span></td>
+                              <td><span className="badge b-flagged">{inv.status}</span></td>
+                              <td>
+                                {inv.status === "pending" && (
+                                  <button className="btn-primary btn-sm" style={{ background: "var(--green)", borderColor: "var(--green)", fontSize: 11, padding: "5px 12px" }} onClick={() => simulateAccept(inv.id)}>
+                                    Simulate Accept
+                                  </button>
+                                )}
+                              </td>
+                              <td>
+                                <button className="revoke-btn" style={{ color: "var(--red)" }} onClick={() => removeMember(inv.id)}>Cancel</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showInviteModal && (
+              <div className="risk-overlay-form" onClick={() => setShowInviteModal(false)}>
+                <form className="risk-overlay-content" onClick={e => e.stopPropagation()} onSubmit={inviteMember}>
+                  <h3 style={{ fontSize: 18, fontWeight: 800 }}>Invite Workspace Member</h3>
+                  
+                  <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Email Address</span>
+                    <input type="email" className="settings-input" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                  </label>
+
+                  <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Role Class</span>
+                    <select className="settings-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                      <option value="owner">Owner (Full Permissions)</option>
+                      <option value="editor">Editor (Create & Update)</option>
+                      <option value="auditor">Auditor (Read & Verify Ledger)</option>
+                      <option value="viewer">Viewer (Read Only)</option>
+                    </select>
+                  </label>
+
+                  <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+                    <button type="button" className="btn-primary" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)", flex: 1 }} onClick={() => setShowInviteModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                      Send Invitation
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
 }
+
 
 /* ═══════════════════════════ HOW IT WORKS PAGE ═══════════════════ */
 function HowItWorksPage({ setView, onLogout, authenticated }: { setView:(v:string)=>void; onLogout:()=>void; authenticated:boolean }) {

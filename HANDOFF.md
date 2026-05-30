@@ -1,6 +1,47 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-05-30 (Late Night Session: Complete Full-Stack Architectural Expansions)
+
+### Objective
+- Implement and fully integrate the four high-level architectural expansions for AgentShield on both the FastAPI backend and Vite React client:
+  1. **Zero-Downtime Cryptographic Key Rotation** (`GET /v1/keys`, `POST /v1/keys/rotate`).
+  2. **Secure Webhook Alerts & Simulated Ping Trigger** (`POST /v1/settings/webhooks/test` in background tasks).
+  3. **Multi-Tenant Workspace RBAC & Team Directory** (`GET /v1/team/members`, `POST /v1/team/members`, `DELETE /v1/team/members/{id}`, and interactive `accept` mock invite utility).
+  4. **Advanced Behavioral Agent Risk Profiling Modal** (`GET /v1/agents/{id}/behavior` with interactive radial trust scores, dynamic trust score SVG sparklines, and a 10-category threat matrix card panel).
+
+### Completed
+- **Per-Tenant Cryptographic Vault**:
+  - Dynamically seeds genesis active keys on workspace setup to isolate signatures.
+  - Implemented `/keys/rotate` to generate 2048-bit active RSA keypairs, moving old keys to rotated status.
+  - Fully integrated verification loop in `verify_agent_token` to inspect all keys.
+- **Asynchronous Webhook Simulator**:
+  - Wired `POST /v1/settings/webhooks/test` to dispatch HMAC-SHA256 signed test pings inside FastAPI `BackgroundTasks`.
+- **Workspace Team Access Control Directory**:
+  - Implemented invitation RBAC flow for `owner`, `editor`, `auditor`, and `viewer` classes.
+  - Added simulated invitation acceptance (`POST /v1/team/invitations/{id}/accept`) inside the UI for easy local verification.
+- **Advanced Behavioral Agent Risk Profiling**:
+  - Formulated agent behavioral analytics queries exposing trust points history and threat metrics.
+  - Re-designed the client Settings view around four sleek, glassmorphic tabs (General, Vault, Webhooks, Team).
+  - Built a gorgeous sliding behavior modal inside the Agent registry view, presenting an SVG sparkline and threat category counters card matrix.
+- **Durable Postgres persistence**:
+  - Added new tables (`cryptographic_keys`, `invitations`) to `001_initial_schema.sql` and mapped hydration/serialization hooks within `PostgresStore` with 100% backward-compatibility using metadata serialization.
+- **Comprehensive Quality Gates**:
+  - Extended unit tests to cover key rotation, team invitations, and risk score calculations (11/11 tests passing cleanly).
+  - Successfully compiled client build with `npm run build` and restarted backend server process.
+
+### Files Modified
+- `backend/migrations/001_initial_schema.sql` (Added keys and invitations schema)
+- `backend/app/store.py` (Durable Postgres model hydration & persistence)
+- `backend/app/services.py` (Real-time agent risk and trust index updates)
+- `backend/app/main.py` (FastAPI route implementations for keys, webhooks, team directory, and risk profiles)
+- `tests/test_security_core.py` (Key rotation, team invitations, and risk score calculation tests)
+- `frontend/src/main.tsx` (Re-engineered Settings page with tabs, added interactive Risk behavior modal drawer, wired table rows)
+- `frontend/src/styles.css` (Premium namespaced CSS classes for tabs, keycards, member cards, and glowing drawers)
+
+---
+
 ## Session Update - 2026-05-30 (Night Session: Resilient Firebase Auth Fallback, Onboarding checklists & Auth-Aware Marketing)
+
 
 ### Objective
 - Resolve the Firebase token verification issue caused by missing Application Default Credentials (ADC) in local development environments.

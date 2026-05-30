@@ -60,7 +60,12 @@ def issue_agent_token(
         "scopes": ["agent:act"],
     }
     signing_input = f"{_b64url(json.dumps(header, separators=(',', ':')).encode())}.{_b64url(json.dumps(payload, separators=(',', ':')).encode())}"
-    private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    
+    # Load tenant active key if it exists, otherwise fallback to default private_key_pem
+    active_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id and k.status == "active"]
+    target_key_pem = active_keys[0].private_key_pem if active_keys else private_key_pem
+    
+    private_key = serialization.load_pem_private_key(target_key_pem.encode(), password=None)
     signature = private_key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
     token = f"{signing_input}.{_b64url(signature)}"
     record = TokenRecord(jti=jti, tenant_id=tenant_id, agent_id=agent_id, expires_at=exp)
@@ -79,9 +84,27 @@ def verify_agent_token(store: InMemoryStore, settings: Settings, token: str | No
     try:
         payload = json.loads(_b64url_decode(parts[1]))
         signature = _b64url_decode(parts[2])
-        public_key = serialization.load_pem_public_key(public_key_pem.encode())
-        public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
-    except (InvalidSignature, ValueError, json.JSONDecodeError):
+        tenant_id = UUID(payload["tenant_id"])
+        
+        # Load all cryptographic keys for the tenant to support zero-downtime rotation
+        tenant_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id]
+        if tenant_keys:
+            signature_verified = False
+            last_err = None
+            for tk in tenant_keys:
+                try:
+                    public_key = serialization.load_pem_public_key(tk.public_key_pem.encode())
+                    public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+                    signature_verified = True
+                    break
+                except Exception as e:
+                    last_err = e
+            if not signature_verified:
+                raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from last_err
+        else:
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+    except (InvalidSignature, ValueError, json.JSONDecodeError, KeyError):
         raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from None
 
     now_ts = int(datetime.now(timezone.utc).timestamp())

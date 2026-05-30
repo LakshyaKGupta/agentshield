@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -224,19 +224,87 @@ def revoke(agent_id: UUID, api_key=Depends(require_api_key)):
 
 
 @app.post("/v1/shield/analyze")
-def analyze(request: AnalyzeRequest, authorization: str | None = Header(default=None), api_key=Depends(require_api_key)):
+def analyze(
+    request: AnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(default=None),
+    api_key=Depends(require_api_key)
+):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
     try:
-        return analyze_message(store, settings, request, token or "", public_key)
+        verdict = analyze_message(store, settings, request, token or "", public_key)
+        if verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
+            key = str(api_key.tenant_id)
+            prefs = _preferences.get(key)
+            if prefs and prefs.get("webhook_url"):
+                from .security.webhook_dispatcher import dispatch_security_webhook
+                alert_payload = {
+                    "event_type": "security_alert",
+                    "tenant_id": str(api_key.tenant_id),
+                    "agent_id": str(request.agent_id),
+                    "message_or_tool": request.message,
+                    "verdict": verdict.verdict.value,
+                    "evidence": [
+                        {
+                            "source": e.source,
+                            "code": e.code,
+                            "message": e.message,
+                            "confidence": e.confidence
+                        }
+                        for e in verdict.evidence
+                    ],
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                background_tasks.add_task(
+                    dispatch_security_webhook,
+                    prefs["webhook_url"],
+                    prefs["webhook_secret"],
+                    alert_payload
+                )
+        return verdict
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
 
 
 @app.post("/v1/shield/tool-call")
-def tool_call(request: ToolCallRequest, authorization: str | None = Header(default=None), api_key=Depends(require_api_key)):
+def tool_call(
+    request: ToolCallRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(default=None),
+    api_key=Depends(require_api_key)
+):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
     try:
-        return check_tool_call(store, settings, request, token or "", public_key)
+        verdict = check_tool_call(store, settings, request, token or "", public_key)
+        if verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
+            key = str(api_key.tenant_id)
+            prefs = _preferences.get(key)
+            if prefs and prefs.get("webhook_url"):
+                from .security.webhook_dispatcher import dispatch_security_webhook
+                alert_payload = {
+                    "event_type": "tool_call_alert",
+                    "tenant_id": str(api_key.tenant_id),
+                    "agent_id": str(request.agent_id),
+                    "message_or_tool": request.tool,
+                    "verdict": verdict.verdict.value,
+                    "evidence": [
+                        {
+                            "source": e.source,
+                            "code": e.code,
+                            "message": e.message,
+                            "confidence": e.confidence
+                        }
+                        for e in verdict.evidence
+                    ],
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                background_tasks.add_task(
+                    dispatch_security_webhook,
+                    prefs["webhook_url"],
+                    prefs["webhook_secret"],
+                    alert_payload
+                )
+        return verdict
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
 
@@ -399,6 +467,8 @@ class UserPreferences(BaseModel):
     default_agent_ttl: int = 3600
     audit_retention_days: int = 30
     language: str = "en"
+    webhook_url: str | None = None
+    webhook_secret: str | None = None
 
 # In-memory preferences store (per-tenant)
 _preferences: dict = {}
@@ -406,12 +476,27 @@ _preferences: dict = {}
 @app.get("/v1/settings")
 def get_settings_endpoint(api_key=Depends(require_api_key)):
     key = str(api_key.tenant_id)
-    return _preferences.get(key, UserPreferences().model_dump())
+    import secrets
+    prefs = _preferences.get(key)
+    if prefs is None:
+        secret = f"whsec_{secrets.token_hex(16)}"
+        prefs = UserPreferences(webhook_secret=secret).model_dump()
+        _preferences[key] = prefs
+    elif not prefs.get("webhook_secret"):
+        prefs["webhook_secret"] = f"whsec_{secrets.token_hex(16)}"
+        _preferences[key] = prefs
+    return prefs
 
 @app.put("/v1/settings")
 def update_settings_endpoint(prefs: UserPreferences, api_key=Depends(require_api_key)):
     key = str(api_key.tenant_id)
-    _preferences[key] = prefs.model_dump()
+    import secrets
+    existing = _preferences.get(key, {})
+    secret = existing.get("webhook_secret") or f"whsec_{secrets.token_hex(16)}"
+    
+    prefs_dict = prefs.model_dump()
+    prefs_dict["webhook_secret"] = secret
+    _preferences[key] = prefs_dict
     return {"status": "saved", "settings": _preferences[key]}
 
 
@@ -450,6 +535,296 @@ def metrics(api_key=Depends(require_api_key)):
         "threats_total":      len(tenant_threats),
         "threats_unresolved": unresolved_threats,
         "generated_at":       datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/v1/keys")
+def get_keys(api_key=Depends(require_api_key)):
+    tid = api_key.tenant_id
+    keys = [k for k in store.keys.values() if k.tenant_id == tid]
+    
+    # Genesis key seeding if none exists
+    if not keys:
+        genesis_id = _uuid_mod.uuid4()
+        from .security.jwt_identity import generate_dev_keypair
+        priv, pub = generate_dev_keypair()
+        from .store import CryptographicKey
+        key_record = CryptographicKey(
+            id=genesis_id,
+            tenant_id=tid,
+            private_key_pem=priv,
+            public_key_pem=pub,
+            status="active"
+        )
+        store.keys[genesis_id] = key_record
+        store.persist_key(key_record)
+        keys = [key_record]
+        
+    # Return keys without exposing private key PEM
+    return [
+        {
+            "id": str(k.id),
+            "public_key": k.public_key_pem,
+            "created_at": k.created_at.isoformat(),
+            "rotated_at": k.rotated_at.isoformat() if k.rotated_at else None,
+            "status": k.status
+        }
+        for k in keys
+    ]
+
+
+@app.post("/v1/keys/rotate")
+def rotate_keys(api_key=Depends(require_api_key)):
+    tid = api_key.tenant_id
+    
+    # 1. Rotate existing active keys
+    active_keys = [k for k in store.keys.values() if k.tenant_id == tid and k.status == "active"]
+    for ak in active_keys:
+        ak.status = "rotated"
+        ak.rotated_at = datetime.now(timezone.utc)
+        store.persist_key(ak)
+        
+    # 2. Generate a fresh key pair
+    from .security.jwt_identity import generate_dev_keypair
+    priv, pub = generate_dev_keypair()
+    new_id = _uuid_mod.uuid4()
+    from .store import CryptographicKey
+    new_key = CryptographicKey(
+        id=new_id,
+        tenant_id=tid,
+        private_key_pem=priv,
+        public_key_pem=pub,
+        status="active"
+    )
+    store.keys[new_id] = new_key
+    store.persist_key(new_key)
+    
+    # Return all keys
+    all_keys = [k for k in store.keys.values() if k.tenant_id == tid]
+    return [
+        {
+            "id": str(k.id),
+            "public_key": k.public_key_pem,
+            "created_at": k.created_at.isoformat(),
+            "rotated_at": k.rotated_at.isoformat() if k.rotated_at else None,
+            "status": k.status
+        }
+        for k in all_keys
+    ]
+
+
+@app.post("/v1/settings/webhooks/test")
+def test_webhook(background_tasks: BackgroundTasks, api_key=Depends(require_api_key)):
+    key = str(api_key.tenant_id)
+    prefs = _preferences.get(key)
+    if prefs is None or not prefs.get("webhook_url"):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "WEBHOOK_URL_NOT_CONFIGURED", "message": "Please configure a Webhook URL in your settings first."}
+        )
+    
+    webhook_url = prefs["webhook_url"]
+    webhook_secret = prefs["webhook_secret"] or "whsec_demosecret123"
+    
+    # Simulated webhook payload
+    alert_payload = {
+        "event_type": "webhook_test",
+        "tenant_id": str(api_key.tenant_id),
+        "message_or_tool": "Simulated AgentShield test event payload",
+        "verdict": "FLAGGED",
+        "evidence": [
+            {
+                "source": "test_simulation",
+                "code": "WEBHOOK_TEST_PING",
+                "message": "This is a simulated threat alert dispatched to test developer connectivity.",
+                "confidence": 1.0
+            }
+        ],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    from .security.webhook_dispatcher import dispatch_security_webhook
+    background_tasks.add_task(
+        dispatch_security_webhook,
+        webhook_url,
+        webhook_secret,
+        alert_payload
+    )
+    return {"status": "success", "message": "Test webhook successfully queued.", "webhook_url": webhook_url}
+
+
+class InviteMemberRequest(BaseModel):
+    email: str
+    role: str # owner, editor, auditor, viewer
+
+
+@app.get("/v1/team/members")
+def get_team_members(api_key=Depends(require_api_key)):
+    tid = api_key.tenant_id
+    
+    # Gather active users
+    members = [
+        {
+            "id": str(u.id),
+            "email": u.email,
+            "role": u.role,
+            "status": "active",
+            "created_at": u.created_at.isoformat()
+        }
+        for u in store.users.values()
+        if u.tenant_id == tid
+    ]
+    
+    # Gather pending invitations
+    invites = [
+        {
+            "id": str(inv.id),
+            "email": inv.email,
+            "role": inv.role,
+            "status": inv.status,
+            "created_at": inv.created_at.isoformat()
+        }
+        for inv in store.invitations.values()
+        if inv.tenant_id == tid
+    ]
+    
+    return {"members": members, "invitations": invites}
+
+
+@app.post("/v1/team/members")
+def invite_team_member(request: InviteMemberRequest, api_key=Depends(require_api_key)):
+    tid = api_key.tenant_id
+    email = request.email.strip().lower()
+    
+    # Check roles
+    if request.role not in {"owner", "editor", "auditor", "viewer"}:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_ROLE", "message": "Role must be owner, editor, auditor, or viewer."})
+        
+    # Check if already a member
+    for u in store.users.values():
+        if u.tenant_id == tid and u.email == email:
+            raise HTTPException(status_code=409, detail={"code": "MEMBER_ALREADY_EXISTS", "message": "User is already a member of this workspace."})
+            
+    # Check if already invited
+    for inv in store.invitations.values():
+        if inv.tenant_id == tid and inv.email == email and inv.status == "pending":
+            raise HTTPException(status_code=409, detail={"code": "INVITATION_ALREADY_EXISTS", "message": "An invitation has already been sent to this email."})
+            
+    # Create invitation record
+    inv_id = _uuid_mod.uuid4()
+    from .store import Invitation
+    invitation = Invitation(
+        id=inv_id,
+        tenant_id=tid,
+        email=email,
+        role=request.role,
+        status="pending"
+    )
+    store.invitations[inv_id] = invitation
+    store.persist_invitation(invitation)
+    
+    return {
+        "id": str(invitation.id),
+        "email": invitation.email,
+        "role": invitation.role,
+        "status": invitation.status,
+        "created_at": invitation.created_at.isoformat()
+    }
+
+
+@app.post("/v1/team/invitations/{inv_id}/accept")
+def accept_invitation(inv_id: UUID):
+    inv = store.invitations.get(inv_id)
+    if not inv or inv.status != "pending":
+        raise HTTPException(status_code=404, detail={"code": "INVITATION_NOT_FOUND", "message": "Invitation not found or already accepted."})
+        
+    # Create workspace user
+    from .store import WorkspaceUser
+    user_id = _uuid_mod.uuid4()
+    # Create pbkdf2 hash for placeholder password
+    import secrets
+    from .services import _hash_password
+    placeholder_pw = _hash_password(secrets.token_hex(32))
+    
+    user = WorkspaceUser(
+        id=user_id,
+        tenant_id=inv.tenant_id,
+        email=inv.email,
+        password_hash=placeholder_pw,
+        role=inv.role
+    )
+    store.users[inv.email] = user
+    store.persist_user(user)
+    
+    # Mark invitation accepted
+    inv.status = "accepted"
+    store.persist_invitation(inv)
+    
+    return {"status": "success", "message": f"Invitation accepted. User {inv.email} added to team."}
+
+
+@app.delete("/v1/team/members/{member_id}")
+def remove_team_member(member_id: UUID, api_key=Depends(require_api_key)):
+    tid = api_key.tenant_id
+    
+    # Check if active user
+    target_user = None
+    for u in store.users.values():
+        if u.tenant_id == tid and u.id == member_id:
+            target_user = u
+            break
+            
+    if target_user:
+        # Check that we aren't deleting the last owner
+        owners = [u for u in store.users.values() if u.tenant_id == tid and u.role == "owner"]
+        if target_user.role == "owner" and len(owners) <= 1:
+            raise HTTPException(status_code=400, detail={"code": "CANNOT_REMOVE_LAST_OWNER", "message": "Workspace must have at least one active owner."})
+            
+        del store.users[target_user.email]
+        return {"status": "success", "message": "Team member successfully removed."}
+        
+    # Check if pending invitation
+    if member_id in store.invitations:
+        inv = store.invitations[member_id]
+        if inv.tenant_id == tid:
+            del store.invitations[member_id]
+            return {"status": "success", "message": "Invitation successfully cancelled."}
+            
+    raise HTTPException(status_code=404, detail={"code": "MEMBER_NOT_FOUND", "message": "Team member or invitation not found."})
+
+
+@app.get("/v1/agents/{agent_id}/behavior")
+def get_agent_behavior(agent_id: UUID, api_key=Depends(require_api_key)):
+    agent = store.agents.get(agent_id)
+    if not agent or agent.tenant_id != api_key.tenant_id:
+        raise HTTPException(status_code=404, detail={"code": "AGENT_NOT_FOUND", "message": "Agent not found."})
+        
+    # Load history
+    history = [
+        {
+            "timestamp": th.get("created_at").isoformat() if isinstance(th.get("created_at"), datetime) else th.get("created_at"),
+            "score": float(th.get("score_after")),
+            "delta": float(th.get("delta")),
+            "reason": th.get("reason", "update")
+        }
+        for th in store.trust_history
+        if th["agent_id"] == agent_id
+    ]
+    
+    # Sort history by timestamp
+    try:
+        history = sorted(history, key=lambda x: x["timestamp"])
+    except Exception:
+        pass
+        
+    return {
+        "agent_id": str(agent.id),
+        "name": agent.name,
+        "trust_score": agent.trust_score,
+        "risk_score": agent.risk_score,
+        "risk_profile": agent.risk_profile,
+        "threat_counts": agent.threat_counts,
+        "trust_history": history if history else [{"timestamp": datetime.now(timezone.utc).isoformat(), "score": agent.trust_score, "delta": 0.0, "reason": "genesis"}]
     }
 
 

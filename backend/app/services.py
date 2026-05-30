@@ -136,6 +136,57 @@ def _apply_trust(agent: AgentRecord, delta: float) -> float:
     return agent.trust_score
 
 
+def _update_agent_threats_and_risk(agent: AgentRecord, attack_code: str | None, delta: float, reason: str) -> None:
+    # Append to trust history
+    timestamp = datetime.now(timezone.utc).isoformat()
+    agent.trust_score_history.append({
+        "timestamp": timestamp,
+        "score": agent.trust_score,
+        "delta": delta,
+        "reason": reason
+    })
+    
+    # Increment threat counts if applicable
+    if attack_code:
+        code = attack_code.upper()
+        category = "jailbreak"
+        if "INSTRUCTION_OVERRIDE" in code:
+            category = "instruction_override"
+        elif "PROMPT_EXFILTRATION" in code or "SECRET_EXFILTRATION" in code:
+            category = "prompt_exfiltration"
+        elif "SYSTEM_TOKEN" in code:
+            category = "system_token_injection"
+        elif "JAILBREAK" in code or "DEVMODE" in code:
+            category = "jailbreak"
+        elif "ROLE" in code or "PLAY_BYPASS" in code:
+            category = "role_hijacking"
+        elif "DATA_EXFILTRATION" in code or "FILE_TRAVERSAL" in code or "PATH_TRAVERSAL" in code:
+            category = "data_exfiltration"
+        elif "SQL" in code:
+            category = "sql_injection"
+        elif "SSRF" in code:
+            category = "ssrf_open_redirect"
+        elif "PRIVILEGE" in code:
+            category = "privilege_escalation"
+        elif "SHELL" in code:
+            category = "shell_injection"
+        elif "UNAUTHORIZED" in code:
+            category = "privilege_escalation"
+            
+        if category in agent.threat_counts:
+            agent.threat_counts[category] += 1
+            
+    # Recalculate risk score and profile
+    agent.risk_score = round(1.0 - agent.trust_score, 3)
+    if agent.trust_score >= 0.9:
+        agent.risk_profile = "Safe"
+    elif agent.trust_score >= 0.5:
+        agent.risk_profile = "Guarded"
+    else:
+        agent.risk_profile = "Critical Risk"
+
+
+
 def spawn_agent(store: InMemoryStore, settings: Settings, request: AgentCreateRequest, tenant_id, private_key_pem: str) -> AgentResponse:
     agent = AgentRecord(
         id=uuid4(),
@@ -251,7 +302,10 @@ def analyze_message(
 
     delta = _trust_delta(detection.verdict, detection.evidence)
     trust_score = _apply_trust(agent, delta)
+    attack_code = detection.evidence[0].code if (detection.verdict != Verdict.ALLOWED and detection.evidence) else None
+    _update_agent_threats_and_risk(agent, attack_code, delta, "message_verdict")
     severity = Severity.CRITICAL if detection.threat_level == ThreatLevel.CRITICAL else Severity.WARN if detection.verdict == Verdict.FLAGGED else Severity.INFO
+
     entry = append_ledger_entry(
         store,
         tenant_id=agent.tenant_id,
@@ -312,6 +366,9 @@ def check_tool_call(
     threat_level = ThreatLevel.NONE if allowed else ThreatLevel.HIGH
     delta = _trust_delta(verdict, evidence_list)
     trust_score = _apply_trust(agent, delta)
+    attack_code = "unauthorized_tool_call" if not allowed else None
+    _update_agent_threats_and_risk(agent, attack_code, delta, "tool_call_verdict")
+
     entry = append_ledger_entry(
         store,
         tenant_id=agent.tenant_id,

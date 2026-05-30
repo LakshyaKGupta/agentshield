@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentshield"
+version = "1.0.0"
+description = "Runtime security middleware for autonomous AI agents"
+readme = "README.md"
+authors = [
+    { name = "AgentShield Team", email = "support@agentshield.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+    "Intended Audience :: Developers",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.urls]
+Homepage = "https://agentshield.com"
+Documentation = "https://docs.agentshield.com"
+Repository = "https://github.com/LakshyaKGupta/agentshield"
+Issues = "https://github.com/LakshyaKGupta/agentshield/issues"

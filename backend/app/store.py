@@ -45,6 +45,21 @@ class AgentRecord:
     trust_score: float = 1.0
     status: str = "active"
     metadata: dict = field(default_factory=dict)
+    risk_score: float = 0.0
+    risk_profile: str = "Safe"  # Safe, Guarded, Critical Risk
+    threat_counts: dict[str, int] = field(default_factory=lambda: {
+        "instruction_override": 0,
+        "prompt_exfiltration": 0,
+        "system_token_injection": 0,
+        "jailbreak": 0,
+        "role_hijacking": 0,
+        "data_exfiltration": 0,
+        "sql_injection": 0,
+        "ssrf_open_redirect": 0,
+        "privilege_escalation": 0,
+        "shell_injection": 0
+    })
+    trust_score_history: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -62,6 +77,28 @@ class WorkspaceUser:
     tenant_id: UUID
     email: str
     password_hash: str
+    role: str = "owner"  # owner, editor, auditor, viewer
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass
+class CryptographicKey:
+    id: UUID
+    tenant_id: UUID
+    private_key_pem: str
+    public_key_pem: str
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    rotated_at: datetime | None = None
+    status: str = "active"  # active, rotated
+
+
+@dataclass
+class Invitation:
+    id: UUID
+    tenant_id: UUID
+    email: str
+    role: str
+    status: str = "pending"  # pending, accepted
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -77,6 +114,8 @@ class InMemoryStore:
         self.threat_events: list[dict] = []
         self.trust_history: list[dict] = []
         self.events: list[dict] = []
+        self.keys: dict[UUID, CryptographicKey] = {}
+        self.invitations: dict[UUID, Invitation] = {}
 
     def seed_tenant(self, name: str = "Demo Tenant") -> Tenant:
         for tenant in self.tenants.values():
@@ -112,6 +151,12 @@ class InMemoryStore:
         return
 
     def persist_event(self, event: dict) -> None:
+        return
+
+    def persist_key(self, key: CryptographicKey) -> None:
+        return
+
+    def persist_invitation(self, invitation: Invitation) -> None:
         return
 
 
@@ -157,6 +202,7 @@ class PostgresStore(InMemoryStore):
                     last_used_at=row["last_used_at"],
                 )
             for row in conn.execute("SELECT * FROM agents"):
+                meta = row["metadata"] or {}
                 self.agents[row["id"]] = AgentRecord(
                     id=row["id"],
                     tenant_id=row["tenant_id"],
@@ -165,8 +211,24 @@ class PostgresStore(InMemoryStore):
                     permissions=PermissionManifest.model_validate(row["permissions"]),
                     trust_score=float(row["trust_score"]),
                     status=row["status"],
-                    metadata=row["metadata"],
+                    metadata=meta,
+                    risk_score=float(meta.get("risk_score", 0.0)),
+                    risk_profile=meta.get("risk_profile", "Safe"),
+                    threat_counts=meta.get("threat_counts", {
+                        "instruction_override": 0,
+                        "prompt_exfiltration": 0,
+                        "system_token_injection": 0,
+                        "jailbreak": 0,
+                        "role_hijacking": 0,
+                        "data_exfiltration": 0,
+                        "sql_injection": 0,
+                        "ssrf_open_redirect": 0,
+                        "privilege_escalation": 0,
+                        "shell_injection": 0
+                    }),
+                    trust_score_history=meta.get("trust_score_history", [])
                 )
+
             for row in conn.execute("SELECT * FROM agent_tokens"):
                 self.tokens[row["jti"]] = TokenRecord(
                     jti=row["jti"],
@@ -193,6 +255,26 @@ class PostgresStore(InMemoryStore):
             self.threat_events = list(conn.execute("SELECT * FROM threat_events ORDER BY created_at"))
             self.trust_history = list(conn.execute("SELECT * FROM trust_history ORDER BY created_at"))
             self.events = [row["payload"] for row in conn.execute("SELECT payload FROM event_outbox ORDER BY id")]
+            for row in conn.execute("SELECT * FROM cryptographic_keys"):
+                self.keys[row["id"]] = CryptographicKey(
+                    id=row["id"],
+                    tenant_id=row["tenant_id"],
+                    private_key_pem=row["private_key_pem"],
+                    public_key_pem=row["public_key_pem"],
+                    created_at=row["created_at"],
+                    rotated_at=row["rotated_at"],
+                    status=row["status"],
+                )
+            for row in conn.execute("SELECT * FROM invitations"):
+                self.invitations[row["id"]] = Invitation(
+                    id=row["id"],
+                    tenant_id=row["tenant_id"],
+                    email=row["email"],
+                    role=row["role"],
+                    status=row["status"],
+                    created_at=row["created_at"],
+                )
+
 
     def persist_tenant(self, tenant: Tenant) -> None:
         with self._connect() as conn:
@@ -227,6 +309,12 @@ class PostgresStore(InMemoryStore):
             conn.commit()
 
     def persist_agent(self, agent: AgentRecord) -> None:
+        meta = dict(agent.metadata or {})
+        meta["risk_score"] = agent.risk_score
+        meta["risk_profile"] = agent.risk_profile
+        meta["threat_counts"] = agent.threat_counts
+        meta["trust_score_history"] = agent.trust_score_history
+
         with self._connect() as conn:
             conn.execute(
                 """
@@ -234,9 +322,10 @@ class PostgresStore(InMemoryStore):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions, trust_score = EXCLUDED.trust_score, status = EXCLUDED.status, metadata = EXCLUDED.metadata
                 """,
-                (agent.id, agent.tenant_id, agent.name, agent.type, Json(agent.permissions.model_dump()), agent.trust_score, agent.status, Json(agent.metadata)),
+                (agent.id, agent.tenant_id, agent.name, agent.type, Json(agent.permissions.model_dump()), agent.trust_score, agent.status, Json(meta)),
             )
             conn.commit()
+
 
     def persist_token(self, token: TokenRecord) -> None:
         with self._connect() as conn:
@@ -291,6 +380,31 @@ class PostgresStore(InMemoryStore):
         with self._connect() as conn:
             conn.execute("INSERT INTO event_outbox (event_name, payload) VALUES (%s, %s)", (event.get("event", "event"), Json(event)))
             conn.commit()
+
+    def persist_key(self, key: CryptographicKey) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO cryptographic_keys (id, tenant_id, private_key_pem, public_key_pem, created_at, rotated_at, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET rotated_at = EXCLUDED.rotated_at, status = EXCLUDED.status
+                """,
+                (key.id, key.tenant_id, key.private_key_pem, key.public_key_pem, key.created_at, key.rotated_at, key.status),
+            )
+            conn.commit()
+
+    def persist_invitation(self, invitation: Invitation) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO invitations (id, tenant_id, email, role, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status
+                """,
+                (invitation.id, invitation.tenant_id, invitation.email, invitation.role, invitation.status, invitation.created_at),
+            )
+            conn.commit()
+
 
 
 def create_store(database_url: str | None = None) -> InMemoryStore:
