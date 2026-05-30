@@ -213,28 +213,7 @@ function Nav({ setView, solid = false }: { setView: (v: string) => void; solid?:
 /* ══════════════════════════ HANDHOLD-STYLE CHAT BAR ════════════ */
 type ChatMsg = { role: "bot" | "user"; text: string; ts: string };
 
-const BOT_RESPONSES: Record<string, string> = {
-  default:    "AgentShield secures AI agents at runtime — identity verification, deny-by-default permissions, and a hash-chained audit ledger. No LLM on the guard path.",
-  identity:   "Every agent receives a short-lived RS256 JWT on spawn. This cryptographic identity is verified on every protected action before any permission check runs.",
-  permission: "Permissions default to deny. Each agent manifest explicitly lists allowed tool + action pairs. Anything unlisted is blocked before execution.",
-  ledger:     "Every verdict (ALLOWED, BLOCKED, FLAGGED) is appended to a SHA-256 hash-chained ledger. One API call — GET /v1/ledger/verify — checks the entire chain for tampering.",
-  injection:  "Injection detection runs in <200ms using pattern-matching and entropy scoring. No external model call on the synchronous guard path.",
-  pricing:    "Prototype: free forever. Team: $149/mo (PostgreSQL, team auth, monitoring). Enterprise: custom pricing with SSO, SLA, and dedicated support.",
-  start:      "Three API calls: POST /v1/agents → POST /v1/shield/analyze → POST /v1/shield/tool-call. The Python SDK wraps all three in a single decorator.",
-  security:   "AgentShield provides: RS256 identity tokens, deny-by-default manifests, hash-chained audit ledger, and <200ms injection detection. All synchronous.",
-};
-
-function getBotReply(input: string): string {
-  const q = input.toLowerCase();
-  if (q.match(/identity|token|jwt|rs256|auth/))        return BOT_RESPONSES.identity;
-  if (q.match(/permiss|policy|allow|deny|tool|mani/))  return BOT_RESPONSES.permission;
-  if (q.match(/ledger|audit|hash|chain|tamper|verif/)) return BOT_RESPONSES.ledger;
-  if (q.match(/inject|prompt|attack|block|detect/))    return BOT_RESPONSES.injection;
-  if (q.match(/pric|cost|plan|money|free|tier/))       return BOT_RESPONSES.pricing;
-  if (q.match(/start|begin|integrat|how|setup|sdk/))   return BOT_RESPONSES.start;
-  if (q.match(/secur|protect|safe|guard|runtime/))     return BOT_RESPONSES.security;
-  return BOT_RESPONSES.default;
-}
+const BACKEND_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const CHIPS = [
   "What does AgentShield do?",
@@ -253,24 +232,33 @@ function HandholdChat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
 
-  // Show chips when focused OR when there are no messages yet
+  // Show chips only when focused or actively chatting
   const showChips = focused || msgs.length > 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, typing]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const t = text.trim();
-    if (!t) return;
+    if (!t || typing) return;
     setExpanded(true);
     setMsgs(m => [...m, { role: "user", text: t, ts: getTs() }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: t }),
+      });
+      const data = await res.json();
+      setMsgs(m => [...m, { role: "bot", text: data.reply ?? "Sorry, I couldn't get a response. Please try again.", ts: getTs() }]);
+    } catch {
+      setMsgs(m => [...m, { role: "bot", text: "Backend is offline. Please start the API server and try again.", ts: getTs() }]);
+    } finally {
       setTyping(false);
-      setMsgs(m => [...m, { role: "bot", text: getBotReply(t), ts: getTs() }]);
-    }, 700 + Math.random() * 500);
+    }
   };
 
   return (
@@ -738,7 +726,7 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
             Continue with Google
           </button>
           <button className="btn-dev" onClick={doDevLogin} disabled={loading}>
-            {loading ? <span className="spin spin--dark"/> : <>⚡ Dev quick login<span className="btn-dev__hint">auto sign-in for testing</span></>}
+            {loading ? <span className="spin spin--dark"/> : <>Dev quick login<span className="btn-dev__hint">auto sign-in for testing</span></>}
           </button>
         </div>
       </div>
@@ -746,14 +734,60 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
   );
 }
 
+/* ═══════════════════════════ SIDEBAR ICONS ═════════════════════ */
+const SidebarIcons: Record<string, JSX.Element> = {
+  app: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+  agents: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  ),
+  ledger: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <polyline points="9 12 11 14 15 10"/>
+    </svg>
+  ),
+  attack: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+  ),
+  settings: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+  ),
+};
+
 /* ═══════════════════════════ APP SHELL ══════════════════════════ */
 function Sidebar({ active, setView, onLogout }: { active: string; setView: (v: string) => void; onLogout: () => void }) {
+  const NAV = [
+    ["app",      "Dashboard"],
+    ["agents",   "Agents"],
+    ["ledger",   "Ledger"],
+    ["attack",   "Attack Sim"],
+    ["settings", "Settings"],
+  ] as const;
   return (
     <aside className="sidebar">
       <button className="sidebar__brand" onClick={() => setView("home")}><ShieldLogo size={18}/> AgentShield</button>
       <nav className="sidebar__nav">
-        {[["app","🛡  Dashboard"],["agents","🤖  Agents"],["ledger","📋  Ledger"],["attack","⚡  Attack Sim"]].map(([v,l]) => (
-          <button key={v} className={`sidebar__link ${active===v?"active":""}`} onClick={() => setView(v)}>{l}</button>
+        {NAV.map(([v, l]) => (
+          <button
+            key={v}
+            className={`sidebar__link ${active === v ? "active" : ""}`}
+            onClick={() => setView(v)}
+          >
+            <span className="sidebar__icon">{SidebarIcons[v]}</span>
+            {l}
+          </button>
         ))}
       </nav>
       <button className="sidebar__logout" onClick={onLogout}>Sign out</button>
@@ -883,6 +917,103 @@ function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setV
   );
 }
 
+/* ═══════════════════════════ SETTINGS PAGE ══════════════════════ */
+function SettingsPage({ setView, onLogout }: { setView:(v:string)=>void; onLogout:()=>void }) {
+  const [theme,     setTheme]     = useState("light");
+  const [notifs,    setNotifs]    = useState(true);
+  const [ttl,       setTtl]       = useState(3600);
+  const [retention, setRetention] = useState(30);
+  const [saved,     setSaved]     = useState(false);
+
+  const save = async () => {
+    const apiKey = localStorage.getItem("as_key");
+    if (!apiKey) return;
+    try {
+      await fetch(`${BACKEND_URL}/v1/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-AgentShield-API-Key": apiKey },
+        body: JSON.stringify({ theme, notifications_enabled: notifs, default_agent_ttl: ttl, audit_retention_days: retention, language: "en" }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch { /* offline */ }
+  };
+
+  return (
+    <div className="app-shell">
+      <Sidebar active="settings" setView={setView} onLogout={onLogout}/>
+      <main className="app-main">
+        <div className="app-topbar"><h1>Settings &amp; Personalization</h1></div>
+        <div className="settings-grid">
+          {/* Appearance */}
+          <div className="panel settings-panel">
+            <div className="panel__title">Appearance</div>
+            <div className="settings-row">
+              <label className="settings-label">Theme</label>
+              <div className="settings-toggle-group">
+                {["light","dark","system"].map(t => (
+                  <button key={t} className={`settings-toggle${theme===t?" active":""}`} onClick={() => setTheme(t)}>
+                    {t.charAt(0).toUpperCase()+t.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="panel settings-panel">
+            <div className="panel__title">Notifications</div>
+            <div className="settings-row">
+              <label className="settings-label">Security alerts</label>
+              <button
+                className={`settings-switch${notifs?" on":""}`}
+                onClick={() => setNotifs(n => !n)}
+                aria-checked={notifs}
+                role="switch"
+              >
+                <span className="settings-switch__thumb"/>
+              </button>
+            </div>
+          </div>
+
+          {/* Agent defaults */}
+          <div className="panel settings-panel">
+            <div className="panel__title">Agent Defaults</div>
+            <div className="settings-row">
+              <label className="settings-label">Default token TTL (seconds)</label>
+              <input
+                type="number" min={60} max={86400} step={60}
+                className="settings-input"
+                value={ttl}
+                onChange={e => setTtl(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Audit */}
+          <div className="panel settings-panel">
+            <div className="panel__title">Audit &amp; Compliance</div>
+            <div className="settings-row">
+              <label className="settings-label">Ledger retention (days)</label>
+              <input
+                type="number" min={1} max={365}
+                className="settings-input"
+                value={retention}
+                onChange={e => setRetention(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-footer">
+          <button className="btn-primary" onClick={save}>Save changes</button>
+          {saved && <span className="settings-saved">Changes saved</span>}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 /* ═══════════════════════════ ERROR BOUNDARY ═════════════════════ */
 class ErrorBoundary extends React.Component<{children:React.ReactNode},{hasError:boolean;error:Error|null}> {
   constructor(props:{children:React.ReactNode}) { super(props); this.state={hasError:false,error:null}; }
@@ -911,10 +1042,11 @@ function App() {
   const shield = useData(apiKey);
 
   if (view==="login"||view==="signup") return <AuthPage mode={view as "login"|"signup"} setView={setView} onAuth={handleAuth}/>;
-  if (view==="app")    return <Dashboard setView={setView} data={shield.data} onLogout={handleLogout}/>;
-  if (view==="ledger") return <LedgerPage setView={setView} data={shield.data} verifyLedger={shield.verifyLedger} onLogout={handleLogout}/>;
-  if (view==="attack") return <AttackPage setView={setView} runAttack={shield.runAttack} onLogout={handleLogout}/>;
-  if (view==="agents") return <AgentsPage setView={setView} data={shield.data} revokeAgent={shield.revokeAgent} spawnAgent={shield.spawnAgent} onLogout={handleLogout}/>;
+  if (view==="app")      return <Dashboard setView={setView} data={shield.data} onLogout={handleLogout}/>;
+  if (view==="ledger")   return <LedgerPage setView={setView} data={shield.data} verifyLedger={shield.verifyLedger} onLogout={handleLogout}/>;
+  if (view==="attack")   return <AttackPage setView={setView} runAttack={shield.runAttack} onLogout={handleLogout}/>;
+  if (view==="agents")   return <AgentsPage setView={setView} data={shield.data} revokeAgent={shield.revokeAgent} spawnAgent={shield.spawnAgent} onLogout={handleLogout}/>;
+  if (view==="settings") return <SettingsPage setView={setView} onLogout={handleLogout}/>;
   return <Marketing setView={setView}/>;
 }
 

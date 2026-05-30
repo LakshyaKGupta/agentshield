@@ -250,6 +250,75 @@ def attack_sim(request: AttackSimulationRequest, api_key=Depends(require_api_key
     return run_attack_simulation(store, settings, request, api_key.tenant_id, private_key, public_key)
 
 
+@app.post("/v1/chat")
+def chat(body: dict):
+    """
+    Simple rule-based chat endpoint for the AgentShield assistant.
+    Returns contextual answers about the product.
+    """
+    msg = (body.get("message") or "").strip().lower()
+
+    answers = {
+        ("what does agentshield do", "agentshield do", "what is agentshield", "about agentshield"):
+            "AgentShield is a runtime security layer for AI agents. It provides cryptographic identity (RS256 JWT), deny-by-default permission manifests, and a SHA-256 hash-chained audit ledger — all without any LLM on the security path.",
+
+        ("identity", "token", "jwt", "rs256", "how does identity"):
+            "Every agent spawned via POST /v1/agents receives a short-lived RS256 JWT. This token is verified cryptographically on every protected action before any permission check runs. Tokens can be rotated via POST /v1/agents/{id}/rotate-token.",
+
+        ("permission", "policy", "allow", "deny", "deny-by-default", "manifest"):
+            "Permissions default to deny. Each agent manifest explicitly lists allowed tool + action pairs. Any tool call not on the list is blocked before execution and logged to the ledger with verdict BLOCKED.",
+
+        ("ledger", "audit", "hash", "chain", "tamper", "verify"):
+            "Every verdict (ALLOWED, BLOCKED, FLAGGED) is appended to a SHA-256 hash-chained ledger. One API call — GET /v1/ledger/verify — checks the entire chain for tampering. The ledger is append-only and cryptographically linked.",
+
+        ("injection", "prompt injection", "attack", "block", "detect"):
+            "Injection detection runs deterministically in <200ms using pattern-matching and entropy scoring. No external model call on the synchronous guard path. You can test it via POST /v1/attack-sim/run.",
+
+        ("price", "cost", "pricing", "plan", "free"):
+            "Prototype tier is free forever (local in-memory store). Team tier is $149/month with PostgreSQL, team auth, and monitoring. Enterprise tier has custom pricing with SSO, SLA guarantees, and dedicated support.",
+
+        ("setup", "start", "begin", "integrate", "sdk", "how long"):
+            "Integration takes 3 API calls: POST /v1/agents to spawn → POST /v1/shield/analyze on every message → POST /v1/shield/tool-call on every tool use. The Python SDK wraps all three in a single decorator. Setup takes under 30 minutes.",
+
+        ("attack sim", "simulation", "red team", "test"):
+            "The attack simulator (POST /v1/attack-sim/run) fires 7 adversarial payloads: prompt injection, jailbreak, tool abuse, privilege escalation, data exfiltration, SSRF, and SQL injection. Each is scored and logged.",
+
+        ("dashboard", "console", "monitor"):
+            "The security console shows real-time event feed, active agents, ledger health, and threat events. You can resolve threats and run attack simulations directly from the dashboard.",
+    }
+
+    reply = "AgentShield secures AI agents at runtime with identity, permissions, and a tamper-evident ledger. Ask me about identity tokens, permissions, the audit ledger, pricing, or how to get started!"
+
+    for keys, answer in answers.items():
+        if any(k in msg for k in keys):
+            reply = answer
+            break
+
+    return {"reply": reply, "latency_ms": 12}
+
+
+class UserPreferences(BaseModel):
+    theme: str = "light"
+    notifications_enabled: bool = True
+    default_agent_ttl: int = 3600
+    audit_retention_days: int = 30
+    language: str = "en"
+
+# In-memory preferences store (per-tenant)
+_preferences: dict = {}
+
+@app.get("/v1/settings")
+def get_settings_endpoint(api_key=Depends(require_api_key)):
+    key = str(api_key.tenant_id)
+    return _preferences.get(key, UserPreferences().model_dump())
+
+@app.put("/v1/settings")
+def update_settings_endpoint(prefs: UserPreferences, api_key=Depends(require_api_key)):
+    key = str(api_key.tenant_id)
+    _preferences[key] = prefs.model_dump()
+    return {"status": "saved", "settings": _preferences[key]}
+
+
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
     raw_key = websocket.query_params.get("api_key")

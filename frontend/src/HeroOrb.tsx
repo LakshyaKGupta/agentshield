@@ -149,7 +149,7 @@ export default function HeroWave() {
         H * 0.58, H * 0.048, 0.0048, 0.55, 0,
         "rgba(251,191,36,0.18)",
         "rgba(245,158,11,0.42)",
-        -12,
+        -1.5,
       );
 
       // Layer 2 — sky blue (mid)
@@ -157,7 +157,7 @@ export default function HeroWave() {
         H * 0.65, H * 0.042, 0.0062, 0.72, 2.1,
         "rgba(125,211,252,0.22)",
         "rgba(56,189,248,0.52)",
-        -18,
+        -2.5,
       );
 
       // Layer 3 — violet (front, most movement)
@@ -165,7 +165,7 @@ export default function HeroWave() {
         H * 0.72, H * 0.036, 0.0079, 0.90, 4.4,
         "rgba(196,181,253,0.20)",
         "rgba(167,139,250,0.48)",
-        -22,
+        -3.5,
       );
 
       drawRipples();
