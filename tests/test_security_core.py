@@ -222,8 +222,24 @@ class SecurityCoreTests(unittest.TestCase):
         self.store.delete_invitation(inv_id)
         self.assertNotIn(inv_id, self.store.invitations)
 
+    def test_outbox_processor_payload_generation(self) -> None:
+        self.tenant.preferences = {"webhook_url": "https://localhost:8000/mock-webhook", "webhook_secret": "whsec_123"}
+        self.store.persist_tenant(self.tenant)
+        alert_payload = {
+            "event_type": "security_alert",
+            "tenant_id": str(self.tenant.id),
+            "agent_id": str(self.agent.agent_id),
+            "message_or_tool": "malicious input",
+            "verdict": "BLOCKED",
+            "timestamp": "2026-05-31T00:00:00Z"
+        }
+        self.store.events.append(alert_payload)
+        self.store.persist_event(alert_payload)
+        self.assertIn(alert_payload, self.store.events)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

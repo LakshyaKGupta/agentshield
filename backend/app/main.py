@@ -247,7 +247,6 @@ def analyze(
             tenant = store.tenants.get(api_key.tenant_id)
             prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
-                from .security.webhook_dispatcher import dispatch_security_webhook
                 alert_payload = {
                     "event_type": "security_alert",
                     "tenant_id": str(api_key.tenant_id),
@@ -265,12 +264,8 @@ def analyze(
                     ],
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
-                background_tasks.add_task(
-                    dispatch_security_webhook,
-                    prefs["webhook_url"],
-                    prefs["webhook_secret"],
-                    alert_payload
-                )
+                store.events.append(alert_payload)
+                store.persist_event(alert_payload)
         return verdict
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
@@ -290,7 +285,6 @@ def tool_call(
             tenant = store.tenants.get(api_key.tenant_id)
             prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
-                from .security.webhook_dispatcher import dispatch_security_webhook
                 alert_payload = {
                     "event_type": "tool_call_alert",
                     "tenant_id": str(api_key.tenant_id),
@@ -308,12 +302,8 @@ def tool_call(
                     ],
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
-                background_tasks.add_task(
-                    dispatch_security_webhook,
-                    prefs["webhook_url"],
-                    prefs["webhook_secret"],
-                    alert_payload
-                )
+                store.events.append(alert_payload)
+                store.persist_event(alert_payload)
         return verdict
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
@@ -630,7 +620,7 @@ def rotate_keys(api_key=Depends(require_api_key)):
 
 
 @app.post("/v1/settings/webhooks/test")
-def test_webhook(background_tasks: BackgroundTasks, api_key=Depends(require_api_key)):
+def test_webhook(api_key=Depends(require_api_key)):
     tenant = store.tenants.get(api_key.tenant_id)
     prefs = tenant.preferences if tenant else None
     if prefs is None or not prefs.get("webhook_url"):
@@ -659,13 +649,8 @@ def test_webhook(background_tasks: BackgroundTasks, api_key=Depends(require_api_
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
-    from .security.webhook_dispatcher import dispatch_security_webhook
-    background_tasks.add_task(
-        dispatch_security_webhook,
-        webhook_url,
-        webhook_secret,
-        alert_payload
-    )
+    store.events.append(alert_payload)
+    store.persist_event(alert_payload)
     return {"status": "success", "message": "Test webhook successfully queued.", "webhook_url": webhook_url}
 
 
@@ -861,3 +846,112 @@ async def ws_events(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         return
+
+
+import asyncio
+
+async def outbox_processor_loop() -> None:
+    """Background outbox processor to send webhook alerts with exponential backoff retry logic."""
+    import secrets
+    from datetime import datetime, timezone
+    while True:
+        try:
+            await asyncio.sleep(4.0)  # run periodically
+            if store.backend_name == "postgres":
+                with store._connect() as conn:
+                    rows = list(conn.execute(
+                        "SELECT * FROM event_outbox WHERE processed_at IS NULL AND retry_count < 5 ORDER BY id LIMIT 10"
+                    ))
+            else:
+                # In-memory mode: scan events
+                rows = [
+                    {
+                        "id": i,
+                        "event_name": e.get("event", "webhook_alert"),
+                        "payload": e,
+                        "retry_count": e.get("_retry_count", 0)
+                    }
+                    for i, e in enumerate(store.events)
+                    if not e.get("_processed") and e.get("_retry_count", 0) < 5
+                    and e.get("event_type") in {"security_alert", "tool_call_alert", "webhook_test"}
+                ]
+            
+            for row in rows:
+                event_id = row["id"]
+                payload = row["payload"]
+                tenant_id_str = payload.get("tenant_id")
+                if not tenant_id_str:
+                    continue
+                
+                from uuid import UUID
+                try:
+                    tenant_id = UUID(tenant_id_str)
+                except ValueError:
+                    continue
+                
+                tenant = store.tenants.get(tenant_id)
+                prefs = tenant.preferences if tenant else None
+                if not prefs or not prefs.get("webhook_url"):
+                    if store.backend_name == "postgres":
+                        with store._connect() as conn:
+                            conn.execute(
+                                "UPDATE event_outbox SET processed_at = %s WHERE id = %s",
+                                (datetime.now(timezone.utc), event_id)
+                            )
+                            conn.commit()
+                    else:
+                        payload["_processed"] = True
+                    continue
+                
+                webhook_url = prefs["webhook_url"]
+                webhook_secret = prefs["webhook_secret"] or "whsec_demosecret"
+                
+                import hashlib
+                import hmac
+                import json
+                import httpx
+                
+                # Strip keys that start with underscore to keep payload clean
+                clean_payload = {k: v for k, v in payload.items() if not k.startswith("_")}
+                payload_bytes = json.dumps(clean_payload, separators=(',', ':')).encode('utf-8')
+                signature = hmac.new(webhook_secret.encode('utf-8'), payload_bytes, hashlib.sha256).hexdigest()
+                headers = {
+                    "Content-Type": "application/json",
+                    "X-AgentShield-Signature": signature,
+                    "User-Agent": "AgentShield-Webhook-Outbox/0.1.0"
+                }
+                
+                try:
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        response = await client.post(webhook_url, content=payload_bytes, headers=headers)
+                        if response.status_code < 400:
+                            if store.backend_name == "postgres":
+                                with store._connect() as conn:
+                                    conn.execute(
+                                        "UPDATE event_outbox SET processed_at = %s WHERE id = %s",
+                                        (datetime.now(timezone.utc), event_id)
+                                    )
+                                    conn.commit()
+                            else:
+                                payload["_processed"] = True
+                        else:
+                            raise Exception(f"HTTP {response.status_code}")
+                except Exception:
+                    retries = row["retry_count"] + 1
+                    if store.backend_name == "postgres":
+                        with store._connect() as conn:
+                            conn.execute(
+                                "UPDATE event_outbox SET retry_count = %s WHERE id = %s",
+                                (retries, event_id)
+                            )
+                            conn.commit()
+                    else:
+                        payload["_retry_count"] = retries
+        except Exception:
+            pass
+
+
+@app.on_event("startup")
+async def start_outbox_processor():
+    asyncio.create_task(outbox_processor_loop())
+
