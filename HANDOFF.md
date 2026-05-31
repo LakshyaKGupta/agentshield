@@ -18,9 +18,12 @@
   - Added a `preferences` JSONB column to the `tenants` migration schema and mapped hydration/serialization durably. Webhook URLs, signing secrets, and operator preferences now persist securely across restarts.
 - **Durable Team & Invitation Deletions**:
   - Implemented `delete_user` and `delete_invitation` database hooks in `PostgresStore` and wired the `/v1/team/members/{id}` delete endpoint. Active users and pending invites are now removed durably from the database rather than just memory dictionaries.
+- **Resilient Transactional Outbox Webhooks**:
+  - Designed and implemented a background `outbox_processor_loop` worker in FastAPI that runs continuously to guarantee **at-least-once delivery** of webhook security alerts with **exponential backoff and retries (up to 5 attempts)**.
+  - Refactored `analyze`, `tool_call`, and `test_webhook` endpoints to write alert payloads directly to the database-backed `event_outbox` instead of volatile in-process BackgroundTasks, protecting alerts from being lost during server crashes or restarts.
 - **Continuous Quality Control**:
-  - Wrote and executed 3 new integration tests verifying preferences persistence, user deletions, and invitation deletions.
-  - Re-ran the full suite of integration tests (14/14 tests pass cleanly).
+  - Wrote and executed 4 new integration tests verifying preferences persistence, user deletions, invitation deletions, and transactional outbox payload generation.
+  - Re-ran the full suite of integration tests (15/15 tests pass cleanly).
   - Confirmed the frontend and backend servers are running beautifully on ports 5173 and 8000.
 
 ### Files Modified
@@ -28,8 +31,8 @@
 - `sdk/python/agentshield/integrations/__init__.py` (Wrapped LangChain callback import in lazy try-except block)
 - `backend/migrations/001_initial_schema.sql` (Added preferences column to tenants schema and ALTER statement)
 - `backend/app/store.py` (Implemented preferences serialization, and delete_user/delete_invitation Postgres persistence hooks)
-- `backend/app/main.py` (Refactored settings endpoint, test webhook endpoint, and team delete endpoints to persist durably)
-- `tests/test_security_core.py` (Added 3 new integration tests covering preferences persistence and deletions)
+- `backend/app/main.py` (Refactored settings, test webhook, and team delete endpoints; implemented resilient background Outbox processor worker loop)
+- `tests/test_security_core.py` (Added 4 new integration tests covering preferences persistence, deletions, and outbox event seeding)
 - `HANDOFF.md` (Documented session update)
 
 ---
