@@ -14,7 +14,15 @@ def hash_api_key(raw_key: str, pepper: str) -> str:
     return hmac.new(pepper.encode(), raw_key.encode(), hashlib.sha256).hexdigest()
 
 
-def create_api_key(store: InMemoryStore, settings: Settings, tenant_id: UUID, scopes: list[str] | None = None) -> str:
+def create_api_key(
+    store: InMemoryStore,
+    settings: Settings,
+    tenant_id: UUID,
+    scopes: list[str] | None = None,
+    *,
+    name: str = "Workspace session",
+    key_type: str = "session",
+) -> str:
     raw_key = "as_live_" + secrets.token_urlsafe(32)
     token_hash = hash_api_key(raw_key, settings.api_key_pepper)
     record = ApiKeyRecord(
@@ -22,10 +30,34 @@ def create_api_key(store: InMemoryStore, settings: Settings, tenant_id: UUID, sc
         tenant_id=tenant_id,
         token_hash=token_hash,
         scopes=scopes or ["agents:write", "shield:write", "ledger:read", "threats:read"],
+        name=name,
+        key_prefix=raw_key[:16],
+        key_type=key_type,
     )
     store.api_keys[token_hash] = record
     store.persist_api_key(record)
     return raw_key
+
+
+def list_sdk_api_keys(store: InMemoryStore, tenant_id: UUID) -> list[ApiKeyRecord]:
+    return sorted(
+        [
+            record
+            for record in store.api_keys.values()
+            if record.tenant_id == tenant_id and record.key_type == "sdk"
+        ],
+        key=lambda record: record.created_at,
+        reverse=True,
+    )
+
+
+def revoke_api_key(store: InMemoryStore, tenant_id: UUID, key_id: UUID) -> ApiKeyRecord:
+    for record in store.api_keys.values():
+        if record.id == key_id and record.tenant_id == tenant_id and record.key_type == "sdk":
+            record.status = "revoked"
+            store.persist_api_key(record)
+            return record
+    raise KeyError(str(key_id))
 
 
 def authenticate_api_key(store: InMemoryStore, settings: Settings, raw_key: str | None, required_scope: str) -> ApiKeyRecord:

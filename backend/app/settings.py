@@ -17,6 +17,11 @@ class Settings:
     jwt_private_key_pem: str | None = None
     jwt_public_key_pem: str | None = None
     database_url: str | None = None
+    redis_url: str | None = None
+    kms_key_arn: str | None = None
+    signing_key_provider: str = "local"
+    key_encryption_key: str | None = None
+    keys_dir: str | None = None
     allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://localhost:5174",
@@ -25,26 +30,34 @@ class Settings:
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
     )
-    demo_mode: bool = True
+    demo_mode: bool = False
+
+
+from .security.secrets_manager import get_secret
 
 
 def get_settings() -> Settings:
     allowed_origins = tuple(
         origin.strip()
-        for origin in os.getenv(
+        for origin in get_secret(
             "ALLOWED_ORIGINS",
             "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175",
         ).split(",")
         if origin.strip()
     )
     return Settings(
-        app_version=os.getenv("APP_VERSION", "0.1.0"),
-        api_key_pepper=os.getenv("API_KEY_PEPPER", "dev-pepper-change-me"),
-        jwt_issuer=os.getenv("JWT_ISSUER", "agentshield.local"),
-        jwt_audience=os.getenv("JWT_AUDIENCE", "agentshield-agents"),
-        jwt_private_key_pem=os.getenv("JWT_PRIVATE_KEY"),
-        jwt_public_key_pem=os.getenv("JWT_PUBLIC_KEY"),
-        database_url=os.getenv("DATABASE_URL"),
+        app_version=get_secret("APP_VERSION", "0.1.0"),
+        api_key_pepper=get_secret("API_KEY_PEPPER", "dev-pepper-change-me"),
+        jwt_issuer=get_secret("JWT_ISSUER", "agentshield.local"),
+        jwt_audience=get_secret("JWT_AUDIENCE", "agentshield-agents"),
+        jwt_private_key_pem=get_secret("JWT_PRIVATE_KEY"),
+        jwt_public_key_pem=get_secret("JWT_PUBLIC_KEY"),
+        database_url=get_secret("DATABASE_URL"),
+        redis_url=get_secret("REDIS_URL"),
+        kms_key_arn=get_secret("KMS_KEY_ARN"),
+        signing_key_provider=get_secret("SIGNING_KEY_PROVIDER", "local"),
+        key_encryption_key=get_secret("KEY_ENCRYPTION_KEY"),
+        keys_dir=get_secret("KEYS_DIR"),
         allowed_origins=allowed_origins,
-        demo_mode=os.getenv("DEMO_MODE", "true").lower() in {"1", "true", "yes", "on"},
+        demo_mode=str(get_secret("DEMO_MODE", "false")).lower() in {"1", "true", "yes", "on"},
     )

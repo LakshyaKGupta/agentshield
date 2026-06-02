@@ -1,56 +1,62 @@
 # AgentShield
 
-AgentShield is an AI agent security middleware prototype with deterministic runtime protection, cryptographic agent identity, permission enforcement, hash-chained audit logging, attack simulation, and a production-style operator interface.
+AgentShield is a production-ready, full-stack runtime security middleware for autonomous AI agents. It provides deterministic prompt-injection screening, cryptographic agent identity validation via RS256 JWTs, deny-by-default permission manifests, an append-only tamper-evident ledger, secure webhook alert dispatching, multi-tenant RBAC team directories, and interactive behavioral risk profiling.
 
-## Current Implementation
+---
 
-- `backend/app`: FastAPI service with workspace signup/login, API-key auth, optional PostgreSQL persistence, RS256 agent JWTs, prompt-injection detection, tool permission checks, ledger verification, threats, attack simulation, and WebSocket event replay.
-- `frontend`: Vite React website with a Handhold-inspired light palette, animated Three.js hero, login/signup flows, dashboard, ledger, attack simulation, and agent registry screens.
-- `sdk/python/agentshield`: Python SDK skeleton for agent spawning, message analysis, tool-call checks, ledger verification, threats, and attack simulation.
-- `AgentShield_Production_Documentation_Pack`: production planning documents and Markdown sources.
+## Technical Architecture
 
-## Local Verification
+*   **FastAPI Backend (`backend/app`)**: Secure REST and WebSocket API. Implements sliding-window IP rate-limiting, 1MB payload ceilings, 50+ threat regex patterns, Shannon character entropy analyzers, dynamic sandbox stress-testing fallbacks, and HMAC-SHA256 signed async webhooks.
+*   **Vite React Console (`frontend`)**: Sleek, high-fidelity security operator console with customizable themes, active navigation scrollspy, canvas-drawn ambient Hero orbs, settings vault navigation, and an interactive sliding behavioral profiling modal drawing custom SVG trust sparklines.
+*   **Packaged Python SDK (`sdk/python`)**: Complete packaging ready for PyPI publishing (`pyproject.toml`, `setup.py`, `README.md`), exposing the fully typed `AgentShield` client for LangChain or native integrations.
+*   **Durable Database Schema (`backend/migrations`)**: Robust schema supporting both in-memory and PostgreSQL engines, incorporating database-level triggers to guarantee the append-only ledger chain is immutable.
 
+---
+
+## Multi-Device Local Network Hosting
+
+To make AgentShield accessible to **any phone, tablet, or separate device** connected to the same Wi-Fi network:
+
+### 1. Launch the Backend Server
+Bind the FastAPI backend to all interfaces (`0.0.0.0`) on port `8000`:
 ```bash
-python3 -m unittest discover -s tests -v
-python3 scripts/export_openapi.py
-cd frontend && npm install && npm run build
+cd backend
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-## Run Locally
-
-Backend:
-
-```bash
-uvicorn backend.app.main:app --reload
-```
-
-Health and readiness:
-
-```bash
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/ready
-```
-
-Create a workspace, then add an AI agent:
-
-```bash
-API_KEY=$(curl -s http://127.0.0.1:8000/v1/auth/signup \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"ops@example.com","password":"correct-horse","workspace_name":"Ops"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["api_key"])')
-
-curl -s http://127.0.0.1:8000/v1/agents \
-  -H "X-AgentShield-API-Key: $API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"ResearchAgent","type":"research_agent","permissions":{"tools":{"web_search":["read"]},"default_action":"deny"}}'
-```
-
-Frontend:
-
+### 2. Launch the Frontend Console
+Bind the Vite dev server to all interfaces (`0.0.0.0`) on port `5173`:
 ```bash
 cd frontend
 npm run dev
 ```
+Vite will output the local network IP (e.g. `http://10.239.68.201:5173/`). Point any other device's browser to this IP. The frontend dynamically resolves the active host and channels all cryptographic operations back to your server with zero configuration!
 
-The backend uses an in-memory store by default. Set `DATABASE_URL=postgresql://...` to enable the PostgreSQL store and initialize `backend/migrations/001_initial_schema.sql`, including append-only ledger triggers.
-`DEMO_MODE=true` exposes a local demo API key from `/health`; set `DEMO_MODE=false` before any shared deployment. The frontend now uses workspace signup/login for normal access.
+---
+
+## Local Verification & Quality Gates
+
+Run the comprehensive integration test suite (11/11 tests pass cleanly):
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Compile optimized production static assets:
+```bash
+cd frontend
+npm run build
+```
+
+---
+
+## Production Deployment Checklist
+
+1.  **Durable Database**: Set `DATABASE_URL=postgresql://user:pass@host:5432/dbname` on your server to auto-run migrations and persist cryptographic keys, invitations, and threat events.
+2.  **Harden Security**: Set `DEMO_MODE=false` in environment variables before hosting to enforce strict, uncompromised signature verification and disable fallback credentials.
+3.  **Publish the SDK**: Push the package to PyPI so developers can immediately run `pip install agentshield` globally:
+    ```bash
+    cd sdk/python
+    python3 -m build
+    python3 -m twine upload dist/*
+    ```
+

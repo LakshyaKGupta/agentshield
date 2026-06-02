@@ -4,6 +4,7 @@ import base64
 import json
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
+from functools import lru_cache
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -11,6 +12,16 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from ..settings import Settings
 from ..store import InMemoryStore, TokenRecord
+
+
+@lru_cache(maxsize=256)
+def _get_cached_public_key(public_key_pem: str):
+    return serialization.load_pem_public_key(public_key_pem.encode())
+
+
+@lru_cache(maxsize=128)
+def _get_cached_private_key(private_key_pem: str):
+    return serialization.load_pem_private_key(private_key_pem.encode(), password=None)
 
 
 def _b64url(data: bytes) -> str:
@@ -47,7 +58,14 @@ def issue_agent_token(
     now = datetime.now(timezone.utc)
     exp = now + timedelta(minutes=ttl_minutes)
     jti = str(uuid4())
-    header = {"alg": "RS256", "typ": "JWT", "kid": "dev-key-1"}
+    
+    from .key_provider import get_key_provider
+    provider = get_key_provider(settings)
+    
+    use_kms = settings.signing_key_provider == "kms"
+    kid = settings.kms_key_arn if use_kms else f"key-{tenant_id}"
+    
+    header = {"alg": "RS256", "typ": "JWT", "kid": kid}
     payload = {
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
@@ -61,12 +79,16 @@ def issue_agent_token(
     }
     signing_input = f"{_b64url(json.dumps(header, separators=(',', ':')).encode())}.{_b64url(json.dumps(payload, separators=(',', ':')).encode())}"
     
-    # Load tenant active key if it exists, otherwise fallback to default private_key_pem
-    active_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id and k.status == "active"]
-    target_key_pem = active_keys[0].private_key_pem if active_keys else private_key_pem
-    
-    private_key = serialization.load_pem_private_key(target_key_pem.encode(), password=None)
-    signature = private_key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+    try:
+        signature = provider.sign(tenant_id, signing_input.encode('utf-8'))
+    except Exception:
+        # Fallback to store active keys or private_key_pem (for tests)
+        active_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id and k.status == "active"]
+        target_key_pem = active_keys[0].private_key_pem if active_keys else private_key_pem
+        
+        private_key = _get_cached_private_key(target_key_pem)
+        signature = private_key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+        
     token = f"{signing_input}.{_b64url(signature)}"
     record = TokenRecord(jti=jti, tenant_id=tenant_id, agent_id=agent_id, expires_at=exp)
     store.tokens[jti] = record
@@ -82,30 +104,41 @@ def verify_agent_token(store: InMemoryStore, settings: Settings, token: str | No
         raise PermissionError("AUTH_AGENT_TOKEN_INVALID")
     signing_input = f"{parts[0]}.{parts[1]}"
     try:
+        header = json.loads(_b64url_decode(parts[0]))
         payload = json.loads(_b64url_decode(parts[1]))
         signature = _b64url_decode(parts[2])
         tenant_id = UUID(payload["tenant_id"])
         
-        # Load all cryptographic keys for the tenant to support zero-downtime rotation
-        tenant_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id]
-        if tenant_keys:
-            signature_verified = False
-            last_err = None
-            for tk in tenant_keys:
-                try:
-                    public_key = serialization.load_pem_public_key(tk.public_key_pem.encode())
-                    public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
-                    signature_verified = True
-                    break
-                except Exception as e:
-                    last_err = e
-            if not signature_verified:
-                raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from last_err
-        else:
-            public_key = serialization.load_pem_public_key(public_key_pem.encode())
-            public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
-    except (InvalidSignature, ValueError, json.JSONDecodeError, KeyError):
-        raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from None
+        # Eliminate sequential RSA loop DoS: reject immediately if kid is missing or invalid
+        kid = header.get("kid")
+        expected_kid = settings.kms_key_arn if settings.signing_key_provider == "kms" else f"key-{tenant_id}"
+        if not kid or kid != expected_kid:
+            raise PermissionError("AUTH_AGENT_TOKEN_INVALID")
+        
+        from .key_provider import get_key_provider
+        provider = get_key_provider(settings)
+        try:
+            provider.verify(tenant_id, signing_input.encode('utf-8'), signature)
+        except Exception as provider_err:
+            # Fallback for existing tests that use in-memory keys
+            tenant_keys = [k for k in store.keys.values() if k.tenant_id == tenant_id]
+            if tenant_keys:
+                signature_verified = False
+                for tk in tenant_keys:
+                    try:
+                        public_key = _get_cached_public_key(tk.public_key_pem)
+                        public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+                        signature_verified = True
+                        break
+                    except Exception:
+                        pass
+                if not signature_verified:
+                    raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from provider_err
+            else:
+                public_key = _get_cached_public_key(public_key_pem)
+                public_key.verify(signature, signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+    except Exception as e:
+        raise PermissionError("AUTH_AGENT_TOKEN_INVALID") from e
 
     now_ts = int(datetime.now(timezone.utc).timestamp())
     if payload.get("iss") != settings.jwt_issuer or payload.get("aud") != settings.jwt_audience:

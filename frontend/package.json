@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e": "playwright test --config=playwright.config.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.1",
@@ -18,5 +19,8 @@
     "three": "^0.181.2",
     "typescript": "^5.9.3",
     "vite": "^7.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
   }
 }

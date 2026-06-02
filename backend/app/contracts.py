@@ -5,7 +5,11 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+import re
+
+_EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
 
 
 class Verdict(StrEnum):
@@ -29,7 +33,7 @@ class Severity(StrEnum):
 
 
 class Evidence(BaseModel):
-    source: Literal["pattern", "permission", "identity", "trust", "llm", "manual"]
+    source: Literal["pattern", "permission", "identity", "trust", "llm", "manual", "heuristic_sandbox", "tool_execution"]
     code: str
     message: str
     confidence: float | None = Field(default=None, ge=0, le=1)
@@ -59,6 +63,11 @@ class AgentResponse(BaseModel):
     token: str
     token_expires_at: datetime
     permissions: PermissionManifest
+    live_connected: bool = False
+    first_live_at: datetime | None = None
+    last_live_at: datetime | None = None
+    runtime_source: str = "registered"
+    is_simulation: bool = False
 
 
 class AgentListResponse(BaseModel):
@@ -70,10 +79,26 @@ class WorkspaceSignupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=200)
     workspace_name: str = Field(min_length=1, max_length=120)
 
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        v_clean = v.strip()
+        if not _EMAIL_REGEX.match(v_clean):
+            raise ValueError("Invalid email address format.")
+        return v_clean
+
 
 class WorkspaceLoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=180)
     password: str = Field(min_length=8, max_length=200)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        v_clean = v.strip()
+        if not _EMAIL_REGEX.match(v_clean):
+            raise ValueError("Invalid email address format.")
+        return v_clean
 
 
 class WorkspaceAuthResponse(BaseModel):
@@ -97,6 +122,20 @@ class ToolCallRequest(BaseModel):
     action: str = Field(min_length=1, max_length=120)
     arguments_hash: str | None = None
     risk_context: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentRunRequest(BaseModel):
+    agent_id: UUID
+    token: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=20_000)
+
+
+class ToolExecuteRequest(BaseModel):
+    agent_id: UUID
+    token: str = Field(min_length=1)
+    tool_name: str = Field(min_length=1, max_length=120)
+    action: str = Field(min_length=1, max_length=120)
+    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class SecurityVerdict(BaseModel):
@@ -154,7 +193,6 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     demo_mode: bool
-    demo_api_key: str | None = None
 
 
 class ReadinessResponse(BaseModel):
@@ -162,7 +200,11 @@ class ReadinessResponse(BaseModel):
     service: str
     version: str
     store: Literal["in_memory", "postgres"]
+    database: str
+    pool_active: int
+    pool_idle: int
     ledger_valid: bool
+    latest_ledger_entry: str | None = None
     ledger_entries: int
     tenant_count: int
     agent_count: int

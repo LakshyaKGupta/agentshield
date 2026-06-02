@@ -1,4 +1,4 @@
-from .client import AgentShield, AgentShieldError, SecurityBlocked
+from .client import AgentShield, AgentShieldError, SecurityBlocked, ShieldedAgent
 
 try:
     from .integrations.langchain import AgentShieldLangChainCallback
@@ -11,6 +11,7 @@ __all__ = [
     "AgentShield",
     "AgentShieldError",
     "SecurityBlocked",
+    "ShieldedAgent",
 ]
 
 if _has_langchain:

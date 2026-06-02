@@ -17,3 +17,13 @@ frontend/dist/
 .env
 .env.*
 !.env.example
+
+# Credentials and Local Keys
+.keys/
+backend/.keys/
+**/__pycache__/
+*.egg-info/
+build/
+dist/
+scratch/
+test-results/
