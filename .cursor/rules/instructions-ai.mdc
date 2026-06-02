@@ -1,0 +1,12 @@
+---
+description: Universal AI execution rules for all projects
+alwaysApply: true
+---
+
+Read and follow `/Users/lol/Docs/instructions.ai/AGENTS.md`.
+
+For every project, inspect local `AGENTS.md`, `PROJECT_CONTEXT.md`, and
+`HANDOFF.md` before changing files. Use the lifecycle in
+`/Users/lol/Docs/instructions.ai/universal-ai-flow.md`, apply
+`/Users/lol/Docs/instructions.ai/quality-gates.md`, and update the project
+handoff after meaningful work.

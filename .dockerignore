@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.playwright-mcp
+frontend/node_modules
+frontend/dist
+sdk/python/build
+sdk/python/dist
+sdk/python/*.egg-info
+.env
+backend/.env
+frontend/.env
+frontend/.env.local

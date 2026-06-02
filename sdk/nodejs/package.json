@@ -1,0 +1,27 @@
+{
+  "name": "agentshield",
+  "version": "1.0.0",
+  "description": "Node.js SDK for AgentShield security middleware",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 0"
+  },
+  "keywords": [
+    "agentshield",
+    "security",
+    "ai",
+    "llm",
+    "agent"
+  ],
+  "author": "AgentShield Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^18.0.0"
+  }
+}

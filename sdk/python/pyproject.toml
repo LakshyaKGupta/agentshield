@@ -10,18 +10,51 @@ readme = "README.md"
 authors = [
     { name = "AgentShield Team", email = "support@agentshield.com" }
 ]
+license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Security",
     "Intended Audience :: Developers",
 ]
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "httpx>=0.24.0",
+]
+
+[project.optional-dependencies]
+langchain = [
+    "langchain-core>=0.1.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "mypy>=1.4.0",
+    "ruff>=0.0.280",
+]
 
 [project.urls]
 Homepage = "https://agentshield.com"
 Documentation = "https://docs.agentshield.com"
 Repository = "https://github.com/LakshyaKGupta/agentshield"
-Issues = "https://github.com/LakshyaKGupta/agentshield/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agentshield*"]
+
+[tool.setuptools.package-data]
+agentshield = ["py.typed"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true

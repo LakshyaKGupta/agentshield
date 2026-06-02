@@ -48,8 +48,8 @@ const FLOAT_ICONS: FloatIcon[] = [
   { Icon: IconDatabase, x: "40%",  y: "78%", delay: 1.8, color: "#93c5fd", dur: 4.6, rotateRange: -8 },
 ];
 
-/* ─── logo list ──────────────────────────────────────── */
-const LOGOS = ["Acme AI","NeuralOps","FlowLabs","Axiom","Synthex","DataMesh","CoreAI","PulseML","Vertex","Echo AI"];
+/* ─── runtime capability strip ───────────────────────── */
+const STACK_ITEMS = ["FastAPI","PostgreSQL","Redis","RS256 JWT","Hash ledger","WebSocket events","Python SDK","Vite console","Firebase optional","Groq optional"];
 
 /* ─── HERO ──────────────────────────────────────────── */
 export default function Hero({ setView, authenticated = false }: { setView: (v: string) => void; authenticated?: boolean }) {
@@ -195,7 +195,7 @@ export default function Hero({ setView, authenticated = false }: { setView: (v: 
           letterSpacing: ".12em", textTransform: "uppercase",
           color: "#9B9B9D", marginBottom: 9,
           fontFamily: "Inter, sans-serif",
-        }}>Trusted by teams building autonomous AI</p>
+        }}>Runtime stack and security controls</p>
         <div style={{
           overflow: "hidden",
           maskImage: "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
@@ -205,8 +205,8 @@ export default function Hero({ setView, authenticated = false }: { setView: (v: 
             animate={{ x: [0, -1200] }}
             transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
             style={{ display: "flex", width: "max-content" }}>
-            {[...Array(3)].flatMap(() => LOGOS.map((n, i) => (
-              <span key={`${n}-${i}`} style={{
+            {[...Array(3)].flatMap((_, groupIndex) => STACK_ITEMS.map((n, i) => (
+              <span key={`${groupIndex}-${n}-${i}`} style={{
                 padding: "0 28px", fontSize: 13.5, fontWeight: 700,
                 letterSpacing: "-.01em", color: "#111", opacity: .17,
                 whiteSpace: "nowrap", fontFamily: "Inter, sans-serif",

@@ -12,6 +12,10 @@ from ..store import InMemoryStore
 GENESIS_HASH = "0" * 64
 
 
+def canonical_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat()
+
+
 def canonical_hash(payload: dict, prev_hash: str) -> str:
     canonical = json.dumps({"prev_hash": prev_hash, "payload": payload}, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()
@@ -35,7 +39,7 @@ def append_ledger_entry(
         "severity": severity.value,
         "verdict": verdict.value,
         "event_data": event_data,
-        "created_at": created_at.isoformat(),
+        "created_at": canonical_timestamp(created_at),
     }
     curr_hash = canonical_hash(payload, prev_hash)
     entry = LedgerEntry(
@@ -68,7 +72,7 @@ def verify_ledger(store: InMemoryStore) -> LedgerVerification:
             "severity": entry.severity.value,
             "verdict": entry.verdict.value,
             "event_data": entry.event_data,
-            "created_at": entry.created_at.isoformat(),
+            "created_at": canonical_timestamp(entry.created_at),
         }
         expected = canonical_hash(payload, prev_hash)
         if expected != entry.curr_hash or entry.prev_hash != prev_hash:

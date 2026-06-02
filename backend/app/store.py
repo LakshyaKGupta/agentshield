@@ -16,6 +16,11 @@ except ImportError:  # pragma: no cover - exercised only without optional databa
     dict_row = None
     Json = None
 
+try:
+    from psycopg_pool import ConnectionPool
+except ImportError:
+    ConnectionPool = None
+
 
 @dataclass
 class Tenant:
@@ -33,6 +38,9 @@ class ApiKeyRecord:
     token_hash: str
     scopes: list[str]
     status: str = "active"
+    name: str = "Workspace session"
+    key_prefix: str = "as_live_"
+    key_type: str = "session"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_used_at: datetime | None = None
 
@@ -119,7 +127,7 @@ class InMemoryStore:
         self.keys: dict[UUID, CryptographicKey] = {}
         self.invitations: dict[UUID, Invitation] = {}
 
-    def seed_tenant(self, name: str = "Demo Tenant") -> Tenant:
+    def seed_tenant(self, name: str = "Local Workspace") -> Tenant:
         for tenant in self.tenants.values():
             if tenant.name == name:
                 return tenant
@@ -171,6 +179,127 @@ class InMemoryStore:
 
 
 
+class PostgresDict(dict):
+    def __init__(self, connect_func, table, key_col, val_col=None, to_obj_func=None):
+        self._connect = connect_func
+        self.table = table
+        self.key_col = key_col
+        self.val_col = val_col
+        self.to_obj = to_obj_func
+
+    def _query_all(self):
+        res = {}
+        with self._connect() as conn:
+            for row in conn.execute(f"SELECT * FROM {self.table}"):
+                obj = self.to_obj(row) if self.to_obj else row
+                key = row[self.key_col]
+                res[key] = obj
+        return res
+
+    def get(self, key, default=None):
+        if key is None:
+            return default
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __getitem__(self, key):
+        if key is None:
+            raise KeyError(key)
+        query_val = key
+        if self.key_col == "id" and isinstance(key, str) and len(key) == 36:
+            try:
+                query_val = UUID(key)
+            except ValueError:
+                pass
+        with self._connect() as conn:
+            row = conn.execute(f"SELECT * FROM {self.table} WHERE {self.key_col} = %s", (query_val,)).fetchone()
+            if row is None:
+                raise KeyError(key)
+            return self.to_obj(row) if self.to_obj else row
+
+    def __contains__(self, key):
+        if key is None:
+            return False
+        query_val = key
+        if self.key_col == "id" and isinstance(key, str) and len(key) == 36:
+            try:
+                query_val = UUID(key)
+            except ValueError:
+                pass
+        with self._connect() as conn:
+            row = conn.execute(f"SELECT 1 FROM {self.table} WHERE {self.key_col} = %s", (query_val,)).fetchone()
+            return row is not None
+
+    def values(self):
+        return self._query_all().values()
+
+    def keys(self):
+        return self._query_all().keys()
+
+    def items(self):
+        return self._query_all().items()
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __len__(self):
+        with self._connect() as conn:
+            row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self.table}").fetchone()
+            return row["cnt"] if row else 0
+
+    def __setitem__(self, key, value):
+        pass
+
+    def __delitem__(self, key):
+        query_val = key
+        if self.key_col == "id" and isinstance(key, str) and len(key) == 36:
+            try:
+                query_val = UUID(key)
+            except ValueError:
+                pass
+        with self._connect() as conn:
+            conn.execute(f"DELETE FROM {self.table} WHERE {self.key_col} = %s", (query_val,))
+            conn.commit()
+
+
+class PostgresList(list):
+    def __init__(self, connect_func, table, to_obj_func=None, order_by=None):
+        self._connect = connect_func
+        self.table = table
+        self.to_obj = to_obj_func
+        self.order_by = order_by
+
+    def _query_all(self):
+        res = []
+        q = f"SELECT * FROM {self.table}"
+        if self.order_by:
+            q += f" ORDER BY {self.order_by}"
+        with self._connect() as conn:
+            for row in conn.execute(q):
+                res.append(self.to_obj(row) if self.to_obj else row)
+        return res
+
+    def __iter__(self):
+        return iter(self._query_all())
+
+    def __len__(self):
+        with self._connect() as conn:
+            row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self.table}").fetchone()
+            return row["cnt"] if row else 0
+
+    def __getitem__(self, index):
+        all_items = self._query_all()
+        return all_items[index]
+
+    def append(self, item):
+        pass
+
+    def __bool__(self):
+        return len(self) > 0
+
+
 class PostgresStore(InMemoryStore):
     def __init__(self, database_url: str) -> None:
         if psycopg is None or dict_row is None:
@@ -178,118 +307,149 @@ class PostgresStore(InMemoryStore):
         super().__init__()
         self.backend_name = "postgres"
         self.database_url = database_url
+        
+        # Initialize database connection pool for high concurrency performance
+        try:
+            if ConnectionPool is not None:
+                self._pool = ConnectionPool(
+                    conninfo=self.database_url,
+                    min_size=2,
+                    max_size=15,
+                    kwargs={"row_factory": dict_row}
+                )
+            else:
+                self._pool = None
+        except Exception as exc:
+            print(f"[store] Failed to initialize connection pool ({exc}); falling back to raw connections")
+            self._pool = None
+
         self._init_schema()
-        self._hydrate()
+
+        self.tenants = PostgresDict(
+            self._connect, "tenants", "id",
+            to_obj_func=lambda r: Tenant(id=r["id"], name=r["name"], status=r["status"], preferences=r.get("preferences") or {})
+        )
+        self.users = PostgresDict(
+            self._connect, "workspace_users", "email",
+            to_obj_func=lambda r: WorkspaceUser(id=r["id"], tenant_id=r["tenant_id"], email=r["email"], password_hash=r["password_hash"], created_at=r["created_at"])
+        )
+        self.api_keys = PostgresDict(
+            self._connect, "api_keys", "token_hash",
+            to_obj_func=lambda r: ApiKeyRecord(
+                id=r["id"],
+                tenant_id=r["tenant_id"],
+                token_hash=r["token_hash"],
+                scopes=r["scopes"],
+                status=r["status"],
+                name=r["name"],
+                key_prefix=r["key_prefix"],
+                key_type=r["key_type"],
+                created_at=r["created_at"],
+                last_used_at=r["last_used_at"],
+            )
+        )
+
+        def agent_row_to_obj(row):
+            meta = row["metadata"] or {}
+            return AgentRecord(
+                id=row["id"],
+                tenant_id=row["tenant_id"],
+                name=row["name"],
+                type=row["type"],
+                permissions=PermissionManifest.model_validate(row["permissions"]),
+                trust_score=float(row["trust_score"]),
+                status=row["status"],
+                metadata=meta,
+                risk_score=float(meta.get("risk_score", 0.0)),
+                risk_profile=meta.get("risk_profile", "Safe"),
+                threat_counts=meta.get("threat_counts", {
+                    "instruction_override": 0,
+                    "prompt_exfiltration": 0,
+                    "system_token_injection": 0,
+                    "jailbreak": 0,
+                    "role_hijacking": 0,
+                    "data_exfiltration": 0,
+                    "sql_injection": 0,
+                    "ssrf_open_redirect": 0,
+                    "privilege_escalation": 0,
+                    "shell_injection": 0
+                }),
+                trust_score_history=meta.get("trust_score_history", [])
+            )
+
+        self.agents = PostgresDict(self._connect, "agents", "id", to_obj_func=agent_row_to_obj)
+
+        self.tokens = PostgresDict(
+            self._connect, "agent_tokens", "jti",
+            to_obj_func=lambda r: TokenRecord(jti=r["jti"], tenant_id=r["tenant_id"], agent_id=r["agent_id"], expires_at=r["expires_at"], revoked_at=r["revoked_at"])
+        )
+
+        def ledger_row_to_obj(row):
+            return LedgerEntry(
+                id=row["id"],
+                tenant_id=row["tenant_id"],
+                agent_id=row["agent_id"],
+                event_type=row["event_type"],
+                severity=Severity(row["severity"]),
+                verdict=Verdict(row["verdict"]),
+                event_data=row["event_data"],
+                prev_hash=row["prev_hash"],
+                curr_hash=row["curr_hash"],
+                created_at=row["created_at"]
+            )
+
+        self.ledger = PostgresList(self._connect, "audit_ledger", to_obj_func=ledger_row_to_obj, order_by="id")
+        self.threat_events = PostgresList(self._connect, "threat_events", order_by="created_at")
+        self.trust_history = PostgresList(self._connect, "trust_history", order_by="created_at")
+        self.events = PostgresList(self._connect, "event_outbox", to_obj_func=lambda r: r["payload"], order_by="id")
+
+        self.keys = PostgresDict(
+            self._connect, "cryptographic_keys", "id",
+            to_obj_func=lambda r: CryptographicKey(id=r["id"], tenant_id=r["tenant_id"], private_key_pem=r["private_key_pem"], public_key_pem=r["public_key_pem"], created_at=r["created_at"], rotated_at=r["rotated_at"], status=r["status"])
+        )
+        self.invitations = PostgresDict(
+            self._connect, "invitations", "id",
+            to_obj_func=lambda r: Invitation(id=r["id"], tenant_id=r["tenant_id"], email=r["email"], role=r["role"], status=r["status"], created_at=r["created_at"])
+        )
 
     def _connect(self):
+        if getattr(self, "_pool", None) is not None:
+            return self._pool.connection()
         return psycopg.connect(self.database_url, row_factory=dict_row)
 
     def _init_schema(self) -> None:
-        migration = Path(__file__).resolve().parents[1] / "migrations" / "001_initial_schema.sql"
-        with self._connect() as conn:
-            conn.execute(migration.read_text())
-            conn.commit()
-
-    def _hydrate(self) -> None:
-        with self._connect() as conn:
-            for row in conn.execute("SELECT * FROM tenants"):
-                self.tenants[row["id"]] = Tenant(
-                    id=row["id"],
-                    name=row["name"],
-                    status=row["status"],
-                    preferences=row.get("preferences") or {},
-                )
-            for row in conn.execute("SELECT * FROM workspace_users"):
-                self.users[row["email"]] = WorkspaceUser(
-                    id=row["id"],
-                    tenant_id=row["tenant_id"],
-                    email=row["email"],
-                    password_hash=row["password_hash"],
-                    created_at=row["created_at"],
-                )
-            for row in conn.execute("SELECT * FROM api_keys"):
-                self.api_keys[row["token_hash"]] = ApiKeyRecord(
-                    id=row["id"],
-                    tenant_id=row["tenant_id"],
-                    token_hash=row["token_hash"],
-                    scopes=row["scopes"],
-                    status=row["status"],
-                    created_at=row["created_at"],
-                    last_used_at=row["last_used_at"],
-                )
-            for row in conn.execute("SELECT * FROM agents"):
-                meta = row["metadata"] or {}
-                self.agents[row["id"]] = AgentRecord(
-                    id=row["id"],
-                    tenant_id=row["tenant_id"],
-                    name=row["name"],
-                    type=row["type"],
-                    permissions=PermissionManifest.model_validate(row["permissions"]),
-                    trust_score=float(row["trust_score"]),
-                    status=row["status"],
-                    metadata=meta,
-                    risk_score=float(meta.get("risk_score", 0.0)),
-                    risk_profile=meta.get("risk_profile", "Safe"),
-                    threat_counts=meta.get("threat_counts", {
-                        "instruction_override": 0,
-                        "prompt_exfiltration": 0,
-                        "system_token_injection": 0,
-                        "jailbreak": 0,
-                        "role_hijacking": 0,
-                        "data_exfiltration": 0,
-                        "sql_injection": 0,
-                        "ssrf_open_redirect": 0,
-                        "privilege_escalation": 0,
-                        "shell_injection": 0
-                    }),
-                    trust_score_history=meta.get("trust_score_history", [])
-                )
-
-            for row in conn.execute("SELECT * FROM agent_tokens"):
-                self.tokens[row["jti"]] = TokenRecord(
-                    jti=row["jti"],
-                    tenant_id=row["tenant_id"],
-                    agent_id=row["agent_id"],
-                    expires_at=row["expires_at"],
-                    revoked_at=row["revoked_at"],
-                )
-            for row in conn.execute("SELECT * FROM audit_ledger ORDER BY id"):
-                self.ledger.append(
-                    LedgerEntry(
-                        id=row["id"],
-                        tenant_id=row["tenant_id"],
-                        agent_id=row["agent_id"],
-                        event_type=row["event_type"],
-                        severity=Severity(row["severity"]),
-                        verdict=Verdict(row["verdict"]),
-                        event_data=row["event_data"],
-                        prev_hash=row["prev_hash"],
-                        curr_hash=row["curr_hash"],
-                        created_at=row["created_at"],
-                    )
-                )
-            self.threat_events = list(conn.execute("SELECT * FROM threat_events ORDER BY created_at"))
-            self.trust_history = list(conn.execute("SELECT * FROM trust_history ORDER BY created_at"))
-            self.events = [row["payload"] for row in conn.execute("SELECT payload FROM event_outbox ORDER BY id")]
-            for row in conn.execute("SELECT * FROM cryptographic_keys"):
-                self.keys[row["id"]] = CryptographicKey(
-                    id=row["id"],
-                    tenant_id=row["tenant_id"],
-                    private_key_pem=row["private_key_pem"],
-                    public_key_pem=row["public_key_pem"],
-                    created_at=row["created_at"],
-                    rotated_at=row["rotated_at"],
-                    status=row["status"],
-                )
-            for row in conn.execute("SELECT * FROM invitations"):
-                self.invitations[row["id"]] = Invitation(
-                    id=row["id"],
-                    tenant_id=row["tenant_id"],
-                    email=row["email"],
-                    role=row["role"],
-                    status=row["status"],
-                    created_at=row["created_at"],
-                )
+        import os
+        import subprocess
+        import sys
+        try:
+            backend_dir = Path(__file__).resolve().parents[1]
+            ini_path = backend_dir / "alembic.ini"
+            # Set DATABASE_URL in env for Alembic
+            env = os.environ.copy()
+            env["DATABASE_URL"] = self.database_url
+            
+            result = subprocess.run(
+                ["alembic", "-c", str(ini_path), "upgrade", "head"],
+                cwd=str(backend_dir),
+                capture_output=True,
+                text=True,
+                env=env
+            )
+            if result.returncode != 0:
+                print(f"Alembic migration failed (code {result.returncode}): {result.stderr}", file=sys.stderr)
+                # Fallback to direct raw SQL script
+                migration = Path(__file__).resolve().parents[1] / "migrations" / "001_initial_schema.sql"
+                with self._connect() as conn:
+                    conn.execute(migration.read_text())
+                    conn.commit()
+            else:
+                print("Alembic database migrations applied successfully.", file=sys.stdout)
+        except Exception as exc:
+            print(f"Failed to run alembic on startup: {exc}. Falling back to raw SQL schema script.", file=sys.stderr)
+            migration = Path(__file__).resolve().parents[1] / "migrations" / "001_initial_schema.sql"
+            with self._connect() as conn:
+                conn.execute(migration.read_text())
+                conn.commit()
 
 
     def persist_tenant(self, tenant: Tenant) -> None:
@@ -320,11 +480,27 @@ class PostgresStore(InMemoryStore):
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO api_keys (id, tenant_id, token_hash, scopes, status, created_at, last_used_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (token_hash) DO UPDATE SET status = EXCLUDED.status, last_used_at = EXCLUDED.last_used_at
+                INSERT INTO api_keys (id, tenant_id, token_hash, scopes, status, name, key_prefix, key_type, created_at, last_used_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (token_hash) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    name = EXCLUDED.name,
+                    key_prefix = EXCLUDED.key_prefix,
+                    key_type = EXCLUDED.key_type,
+                    last_used_at = EXCLUDED.last_used_at
                 """,
-                (api_key.id, api_key.tenant_id, api_key.token_hash, Json(api_key.scopes), api_key.status, api_key.created_at, api_key.last_used_at),
+                (
+                    api_key.id,
+                    api_key.tenant_id,
+                    api_key.token_hash,
+                    Json(api_key.scopes),
+                    api_key.status,
+                    api_key.name,
+                    api_key.key_prefix,
+                    api_key.key_type,
+                    api_key.created_at,
+                    api_key.last_used_at,
+                ),
             )
             conn.commit()
 

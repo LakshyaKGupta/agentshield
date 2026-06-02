@@ -22,7 +22,7 @@ class DetectionResult:
 PATTERNS: list[tuple[str, str, float]] = [
 
     # ── Instruction override ─────────────────────────────────────
-    (r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+instructions?",  "INSTRUCTION_OVERRIDE",   0.97),
+    (r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|system\s+parameters?|parameters?|directives?|rules?|prompts?|settings?)",  "INSTRUCTION_OVERRIDE",   0.97),
     (r"disregard\s+(all\s+)?(previous|prior|above)?\s*(instructions?|rules?|constraints?)", "INSTRUCTION_OVERRIDE", 0.96),
     (r"override\s+(the\s+)?(system\s+)?(prompt|instructions?)", "INSTRUCTION_OVERRIDE", 0.96),
     (r"forget\s+(everything|all|what)\s+(you'?ve?\s+)?(been\s+)?(told|trained|instructed)", "INSTRUCTION_OVERRIDE", 0.95),
@@ -55,7 +55,7 @@ PATTERNS: list[tuple[str, str, float]] = [
     (r"simulate\s+(being|an?)\s+\w+\s*(without|that\s+ignores)\s+(rules|restrictions?|constraints?)", "ROLE_PLAY_BYPASS", 0.88),
 
     # ── Data exfiltration ────────────────────────────────────────
-    (r"(send|email|exfiltrate|upload|post|transmit)\s+(all|the|my|user)\s*(data|files?|credentials?|keys?|secrets?)", "DATA_EXFILTRATION", 0.95),
+    (r"(send|email|exfiltrate|upload|post|transmit)\s+(all|the|my|user)?\s*(?:encryption|system|security|database|raw)?\s*(data|files?|credentials?|keys?|secrets?|tokens?|passwords?)", "DATA_EXFILTRATION", 0.95),
     (r"extract\s+and\s+(send|return|output)\s+(all|the)\s+(data|contents?|files?)", "DATA_EXFILTRATION", 0.93),
     (r"(access|read)\s+\/(etc\/passwd|etc\/shadow|\.env|\.ssh\/id_rsa)", "FILE_TRAVERSAL", 0.99),
     (r"\.\.[\/\\]\.\.[\/\\]", "PATH_TRAVERSAL", 0.97),
