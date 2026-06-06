@@ -13,8 +13,9 @@
 - Converted `Sidebar` to use `useNavigate` + `useLocation` (active item derived from `location.pathname`).
 - Updated `ProductShell` to use the new `Sidebar` (no more `active` / `setView` props).
 - All direct `<Sidebar active="..." setView={...}>` calls (10 locations) updated to `<Sidebar onLogout={...}/>`.
-- Renamed `App` → `AppRouter`. Uses `useNavigate`/`useLocation` internally as a `setView` shim.
+- Converted `App` → `AppRouter`. Uses `useNavigate`/`useLocation` internally as a `setView` shim.
 - `AppRouter` is wrapped in `BrowserRouter` at the render root.
+- Added an `authLoading` state and spinner in `AppRouter` to defer route guard checks until the session validation request (`/v1/auth/me`) resolves. This prevents premature redirects to `/signin` and subsequently back to `/dashboard` on page refresh.
 - All protected routes redirect unauthenticated users to `/signin` preserving the `from` location.
 - Auth routes redirect authenticated users to `/dashboard`.
 - `<Navigate>` fallback catches unknown paths.
