@@ -1,5 +1,799 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-06-04 (UI Focus Pass)
+
+### Objective
+- Tighten the open-layout console so it has stronger visual focus without returning to card-heavy UI.
+- Keep this frontend-only: no backend, auth, persistence, API, ledger, or data-semantics changes.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Dashboard CTA now sits directly under the hero copy inside a constrained hero column.
+  - Dashboard current-step metric now shows remaining-step context and is visually emphasized by CSS.
+  - Evidence lifecycle markup now supports a process rail: Prompt, Risk, Decision, Verdict, Proof.
+  - Enterprise posture metrics are value-first:
+    - `0/0` then `Protected Agents`.
+    - `0` then `Policies`.
+    - `0%` then `Coverage`.
+    - `Valid/Review` then `Ledger`.
+  - Settings page now has a scoped `settings-page` class for open hierarchy styling.
+- Updated `frontend/src/styles.css`:
+  - Dashboard hero content capped at `780px`; CTA aligned below copy.
+  - Dashboard spacing tightened so hero, progress, and metrics read as one sequence.
+  - First Dashboard metric is dominant (`42px` vs `28px` for the next metric in desktop QA).
+  - Protect Agent framework selector is a 5-column desktop grid with equal `148px` tiles.
+  - Protect Agent stepper circles increased to `40px` with thicker connectors and filled active/completed states.
+  - Runtime Decisions timeline desktop min-height increased to `700px`.
+  - Evidence lifecycle changed from loose labels to a horizontal green process rail.
+  - Enterprise columns now share a minimum height; QA measured all three at `769px`.
+  - Settings panels are no longer boxed; form fields, toggles, key rows, and interactive controls keep their borders.
+  - Chat stays centered:
+    - Desktop collapsed width `360px`.
+    - Desktop expanded width `640px`.
+    - Mobile width `358px` on a `390px` viewport.
+  - Added mobile Dashboard spacing so the floating chat sits between setup progress and metrics instead of covering the dominant Current Step metric.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`.
+  - `store: postgres`.
+  - `database: connected`.
+  - `ledger_valid: true`.
+- Playwright desktop QA at `1440x1000` passed:
+  - Dashboard hero column width: `780px`.
+  - Hero CTA is below copy and aligned inside the text column.
+  - Current Step metric font: `42px`; next metric font: `28px`.
+  - Framework selector columns: `5`.
+  - Framework tile heights: `148, 148, 148, 148, 148`.
+  - Runtime timeline height: `700px`.
+  - Evidence lifecycle renders as a 5-step rail.
+  - Enterprise posture is value-first.
+  - Enterprise column heights: `769, 769, 769`.
+  - Settings panel border width: `0px`.
+  - Chat collapsed width: `360px`; expanded width: `640px`.
+- Playwright mobile QA at `390x844` passed:
+  - Chat width: `358px`.
+  - Chat bottom: `828px`.
+  - First Dashboard metric starts at `868px`, so chat no longer overlaps it.
+- Browser screenshots inspected with `view_image`:
+  - `.codex-focus-dashboard-final.png`.
+  - `.codex-focus-protect-final.png`.
+  - `.codex-focus-runtime-final.png`.
+  - `.codex-focus-evidence-final.png`.
+  - `.codex-focus-enterprise-final.png`.
+  - `.codex-focus-settings-final.png`.
+  - `.codex-focus-mobile-final2.png`.
+
+### Notes / Remaining Work
+- This pass did not introduce fake runtime or enterprise data.
+- Enterprise still honestly labels unimplemented production integrations as not configured or needing integration.
+- Legacy hidden/internal pages may still use older panel-heavy styling.
+
+## Session Update - 2026-06-04 (Visual Hierarchy Refactor)
+
+### Objective
+- Refactor the visible AgentShield console away from nested bordered cards and toward a modern developer-tool hierarchy.
+- Keep the work frontend-only: no backend behavior, auth, storage, API contracts, persistence, ledger semantics, or data derivation changes.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Dashboard:
+    - Removed bordered hero and bordered progress-step cards.
+    - Added one horizontal setup progress bar with `0/20/40/60/80/100%` scale, completion percent, current step, and remaining steps.
+    - Kept the compact outcome strip: Current Step, Next Action, Protection Coverage, First Evidence.
+    - Removed standalone pre-activation "What should I do now?" and "Last blocked attack" cards.
+  - Protect Agent:
+    - Removed outer stepper/content panel wrappers.
+    - Changed the setup stepper to connector-style `1 - 2 - 3 - 4 - 5`.
+    - Kept framework cards as the only bordered selection controls in that section.
+  - Live Protection:
+    - Removed bordered hero and metric card panels.
+    - Kept Runtime Decisions as the dominant bordered proof/timeline surface.
+    - Moved Protection Coverage below the timeline as secondary information.
+  - Evidence:
+    - Removed the large bordered empty-state container.
+    - Added compact empty state and renamed education content to `Evidence lifecycle`.
+    - Lifecycle steps now read: Prompt received, Risk evaluated, Tool decision, Threat blocked or request allowed, Ledger proof generated.
+  - Enterprise:
+    - Removed the six-card posture grid.
+    - Added compact `Security Posture` strip with four real workspace-derived posture values.
+    - Renamed `Governance Readiness` to `Audit Readiness`.
+    - Kept `Policy Layer`, `Audit Readiness`, and `Integrations` honest; KMS/HSM, SSO, SIEM/webhooks, and audit export still show unconfigured/needs-integration states instead of fake readiness.
+- Updated `frontend/src/styles.css`:
+  - Added open-layout spacing based on 48px section gaps, 24px subsection gaps, 16px metric-strip gaps, and 20-24px interactive padding.
+  - Removed border treatment from page wrappers, heroes, section groupers, and empty states on the primary journey.
+  - Kept borders on framework tiles, forms, code blocks, timelines, evidence rows, tables, and interactive list rows.
+  - Set framework cards to identical 148px heights with 24px internal padding and subtle selected styling.
+  - Set chat dock to floating bottom-right with 360px desktop width, 380px expanded max width, and `calc(100vw - 32px)` mobile width.
+  - Added mobile hero alignment so the floating chat does not overlap the primary Dashboard CTA or setup progress.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`.
+  - `store: postgres`.
+  - `database: connected`.
+  - `ledger_valid: true`.
+- Playwright desktop QA at `1440x1000` passed:
+  - Dashboard has no `.activation-hero.panel`.
+  - Dashboard has no `.activation-progress.panel`.
+  - Dashboard has no `.activation-step` bordered progress cards.
+  - Dashboard includes `First Evidence` and no longer includes `What should I do now?`.
+  - Protect Agent has no `.protect-stepper.panel` and no `.panel.protect-card`.
+  - Framework tile heights are equal: `148, 148, 148, 148, 148`.
+  - Live Protection timeline is visually dominant: timeline height `580px`, coverage height `139px`.
+  - Evidence empty state is compact: `140px` and includes `Evidence lifecycle`.
+  - Enterprise hero is not a panel, `Audit Readiness` is present, old `Governance Readiness` label is gone, compact posture strip has 4 items, and `Needs integration` appears for unavailable enterprise capabilities.
+  - Chat desktop width is `360px`.
+- Playwright mobile QA at `390x844` passed:
+  - Chat mobile width is `358px`.
+  - Dashboard hero CTA ends at `621px`; chat starts at `773px`.
+  - Setup progress starts at `891px`, below the floating chat.
+- Browser screenshots inspected with `view_image`:
+  - `.codex-visual-dashboard-refactor-final.png`.
+  - `.codex-visual-protect-refactor-final.png`.
+  - `.codex-visual-runtime-refactor-final.png`.
+  - `.codex-visual-evidence-refactor-final.png`.
+  - `.codex-visual-enterprise-refactor-final.png`.
+  - `.codex-visual-mobile-refactor-final3.png`.
+
+### Notes / Remaining Work
+- This was intentionally frontend-only.
+- The Enterprise page still does not implement real policy CRUD/versioning, SSO, KMS/HSM, SIEM exports, or audit export workflows; it labels those as not configured or needs integration.
+- Existing hidden/legacy routes can still have heavier `.panel` usage until they are removed or migrated.
+
+## Session Update - 2026-06-04 (Enterprise Governance Layer)
+
+### Objective
+- Add an enterprise-facing layer without turning AgentShield into a fake dashboard.
+- Preserve the startup/developer journey while giving security buyers a real control/audit surface.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Added `Enterprise` under a separated `Administration` sidebar group.
+  - Added `EnterprisePage`, backed by existing real APIs and workspace state:
+    - `GET /v1/metrics`.
+    - `GET /v1/team/members`.
+    - `GET /v1/settings`.
+    - Existing agents, API keys, ledger, and threats already loaded by the app.
+  - Added enterprise sections:
+    - Organization control-plane hero.
+    - Security posture cards:
+      - Protected Agents.
+      - Policies Active.
+      - Threats Blocked.
+      - Coverage.
+      - Ledger Integrity.
+      - Org Trust.
+    - Policy Layer:
+      - Uses real agent `permissions.tools` manifests.
+      - Shows deny-by-default when an agent has no explicit tool grants.
+      - Does not invent a policy database.
+    - Governance Readiness:
+      - Audit ledger.
+      - Policy manifests.
+      - Team RBAC.
+      - Signed webhooks / SIEM.
+      - KMS/HSM custody.
+      - SSO / directory sync.
+    - Investigation Timeline:
+      - Uses real ledger rows with time, agent, policy/tool, decision, ledger ID, and hash.
+    - Enterprise Integrations:
+      - Shows configured vs. required states for runtime, SIEM/webhooks, RBAC, KMS/HSM, SSO, and audit export.
+  - Kept unimplemented enterprise dependencies honest:
+    - KMS/HSM shows `Needs integration`.
+    - SSO/directory sync shows `Needs integration`.
+    - Webhooks/SIEM show `Not configured` unless a real webhook URL exists.
+    - Org Trust shows `N/A` until registered agents produce runtime evidence.
+- Updated `frontend/src/styles.css`:
+  - Added enterprise page, posture grid, policy table, governance rows, investigation table, and integration-grid styles.
+  - Added sidebar administration section label.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`.
+  - `store: postgres`.
+  - `database: connected`.
+  - `ledger_valid: true`.
+- Playwright signup smoke passed on `http://127.0.0.1:5173`:
+  - Sidebar shows `Administration -> Enterprise`.
+  - Enterprise page renders the organization control plane.
+  - Enterprise posture cards render from backend/workspace state.
+  - Policy Layer renders from actual agent permission manifests or truthful empty state.
+  - Governance Readiness renders real configured/not-configured states.
+  - Investigation Timeline renders from real ledger rows or truthful empty state.
+  - Enterprise Integrations marks KMS/HSM and SSO as needing integration instead of pretending they exist.
+  - Empty workspace no longer displays fake `Org Trust 100`; it shows `N/A`.
+
+### Remaining Enterprise Gaps
+- This is still not full enterprise production readiness.
+- Missing backend-backed enterprise capabilities:
+  - Dedicated policy CRUD/versioning.
+  - Policy assignment by team/agent/environment.
+  - SSO/SAML/OIDC and directory sync.
+  - KMS/HSM key provider integration.
+  - SIEM destinations beyond signed webhook configuration.
+  - Audit export/reporting workflows.
+  - Organization-level multi-workspace hierarchy.
+
+---
+
+## Session Update - 2026-06-04 (UI Alignment and Hierarchy Pass)
+
+### Objective
+- Improve perceived product quality without adding features or changing backend behavior.
+- Align Dashboard, Protect Agent, Live Protection, Evidence, and Settings around one consistent SaaS layout system.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Sidebar now visually separates `Settings` from the primary product journey:
+    - Dashboard.
+    - Protect Agent.
+    - Live Protection.
+    - Evidence.
+    - Divider.
+    - Settings.
+  - Dashboard pre-activation cards now prioritize:
+    - Current Step.
+    - Next Action.
+    - Protection Coverage.
+    - Expected Outcome.
+  - Removed filler pre-activation cards such as estimated setup time/status.
+  - Evidence empty-state CTA moved directly under the explanation, before examples.
+  - Live Protection now renders Runtime Decisions before Protection Coverage so the proof timeline is visually dominant.
+  - Protect Agent stepper labels now read `20% Complete`, `40% Complete`, etc., so percentages belong to each step.
+  - Assistant dock now opens on click/focus and stays compact by default.
+- Updated `frontend/src/styles.css`:
+  - Added consistent page section gaps using a 24px baseline.
+  - Made all framework cards a fixed equal height.
+  - Widened and left-aligned Evidence empty-state content.
+  - Increased Runtime Decisions visual prominence.
+  - Made Protection Coverage more compact.
+  - Changed the assistant from a bottom-center input bar to a bottom-right compact dock to avoid covering content.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`.
+  - `store: postgres`.
+  - `database: connected`.
+  - `ledger_valid: true`.
+- Playwright alignment smoke passed:
+  - Dashboard shows Current Step, Next Action, Protection Coverage, and Expected Outcome.
+  - Dashboard no longer shows the filler Estimated Setup Time/Status cards.
+  - Sidebar has one divider before Settings.
+  - Protect Agent framework card heights are equal at 132px.
+  - Protect Agent step labels show `20% Complete` through `100% Complete`.
+  - Live Protection shows Runtime Decisions before Protection Coverage.
+  - Evidence empty-state content is 820px wide and left-aligned.
+  - Evidence CTA appears before example records.
+  - Assistant dock is 56px collapsed and expands to 420px on click.
+
+### Notes / Remaining Work
+- This was intentionally UI-only.
+- True WebSocket streaming is still future work; Live Protection remains truthful polling over existing backend data.
+
+---
+
+## Session Update - 2026-06-04 (Live Protection Runtime Visibility)
+
+### Objective
+- Make AgentShield's product experience answer the user's core question: "Is protection active, and can I see it working?"
+- Add a runtime visibility page without faking traffic or claiming true streaming before WebSocket support is wired.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Dashboard pre-activation hero now uses outcome language:
+    - `Protection inactive`.
+    - `We haven't seen your agent yet.`
+    - `AgentShield activates automatically after your first protected request.`
+  - Added `Live Protection` to the primary sidebar between `Protect Agent` and `Evidence`.
+  - Added `LiveProtectionPage`:
+    - Shows runtime connected/waiting state.
+    - Polls workspace data every 5 seconds.
+    - Displays live-agent last seen, protected requests, and threats blocked.
+    - Adds a human-readable runtime decision timeline with prompt received, risk analysis, tool decision, verdict, and ledger ID stages.
+    - Keeps empty state truthful: it waits for real SDK/API runtime traffic.
+  - Added a `Protection Coverage` card for:
+    - Prompt Injection.
+    - Tool Abuse.
+    - Data Exfiltration.
+    - Agent Spoofing.
+  - Protect Agent stepper now shows milestone progress percentages from `20%` through `100%`.
+- Updated `frontend/src/styles.css`:
+  - Added Live Protection hero, coverage, timeline, and runtime event styles.
+  - Reused existing restrained dashboard styling instead of introducing a new visual language.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`.
+  - `store: postgres`.
+  - `database: connected`.
+  - `ledger_valid: true`.
+- Playwright signup smoke on `http://127.0.0.1:5173` passed:
+  - Dashboard shows `Protection inactive`.
+  - Dashboard shows `We haven't seen your agent yet`.
+  - Dashboard explains activation after the first protected request.
+  - Sidebar includes exactly the new primary path: Dashboard, Protect Agent, Live Protection, Evidence, Settings.
+  - Protect Agent shows framework cards and milestone percentages `20%`, `40%`, `60%`, `80%`, `100%`.
+  - Protect Agent keeps the correct order: Register Agent before Generate SDK Key.
+  - Live Protection shows waiting state, automatic update copy, Protection Coverage, and Runtime Decisions.
+  - Evidence empty state teaches when evidence appears and shows example records.
+
+### Notes / Remaining Work
+- Live Protection currently uses 5-second polling through the existing `reload()` path. It is truthful runtime visibility, not a WebSocket stream yet.
+- Full live runtime verification still requires a real external SDK/API request from the user's agent.
+- Legacy hidden/unreachable page markup still exists and should be removed only after the new activation path is accepted.
+
+---
+
+## Session Update - 2026-06-03 (main.tsx Fix, Global Skills deployment & instructions.ai integration)
+
+### Objective
+1. Fix syntax error in `frontend/src/main.tsx` (duplicate Dashboard component from patch script re-run).
+2. Install and create the "Lakshya Engineering Stack" Codex skills bundle globally.
+3. Integrate the custom skills into the user's `instructions.ai` skills repository.
+4. Run full Phase 3 verification (backend tests, frontend build, and Playwright E2E smoke tests).
+
+### Changes Made
+
+#### `frontend/src/main.tsx`
+- Removed duplicate old `Dashboard` function body (~170 lines) left behind by a
+  prior `apply_redesign.py` patch run. The stray body started with `}: { setView: ... }) {`
+  at line 1950 and shadowed the already-correct new Dashboard.
+- Added missing closing `}` for the new Dashboard function (was missing after `);`).
+- Defined the missing `ProductShell` layout wrapper component to resolve the `"ProductShell is not defined"` runtime error.
+- Imported the missing `ArrowRight` icon from `lucide-react` to resolve the `"ArrowRight is not defined"` runtime error.
+- Frontend build now succeeds cleanly: 443 modules, 0 errors.
+
+#### `AGENT_SKILLS_INVENTORY.md` (new file)
+- Created comprehensive skills inventory document listing all 42 installed skills,
+  their purpose, source, dependencies, conflicts, and project-specific recommendations.
+
+#### `~/.codex/skills/` (global Codex skills directory)
+- **Newly installed from openai/skills curated list (via git sparse-checkout):**
+  `security-best-practices`, `security-threat-model`, `playwright-interactive`,
+  `screenshot`, `sentry`, `define-goal`, `migrate-to-codex`, `cli-creator`,
+  `pdf`, `notion-knowledge-capture`, `notion-spec-to-implementation`,
+  `notion-research-documentation`
+- **Custom skills authored (Lakshya Engineering Stack bundle):**
+  `typescript-expert`, `python-fastapi`, `postgresql-expert`, `testing-strategy`,
+  `scientific-debugging`, `architecture-review`, `codebase-refactor`,
+  `docs-generator`, `react-expert`, `agent-security-audit`, `saas-startup-review`,
+  `devops-cicd`, `performance-profiler`
+
+#### `/Users/lol/Docs/instructions.ai/skills/` (instructions.ai integration)
+- Copied/created all custom and curated skills from Codex into `/Users/lol/Docs/instructions.ai/skills/`:
+  - **Custom Skills**: `typescript-expert.md`, `python-fastapi.md`, `postgresql-expert.md`, `testing-strategy.md`, `scientific-debugging.md`, `architecture-review.md`, `codebase-refactor.md`, `docs-generator.md`, `react-expert.md`, `agent-security-audit.md`, `saas-startup-review.md`, `devops-cicd.md`, `performance-profiler.md`.
+  - **Curated Skills**: `security-best-practices.md`, `security-threat-model.md`, `playwright-interactive.md`, `screenshot.md`, `sentry.md`, `define-goal.md`, `migrate-to-codex.md`, `cli-creator.md`, `pdf.md`, `notion-knowledge-capture.md`, `notion-spec-to-implementation.md`, `notion-research-documentation.md`, `playwright.md`, `gh-address-comments.md`, `gh-fix-ci.md`.
+
+### Verification
+- **Backend Tests**: ✅ `uv run python -m unittest discover tests` successfully ran 39 tests (3 skipped for Postgres config fallback) with status `OK`.
+- **Frontend Build**: ✅ `npm run build` successfully built production assets: 443 modules transformed in 1.12s, 0 errors.
+- **E2E Smoke Tests**: ✅ `npm run test:e2e` (Playwright) successfully passed 1 Chromium test in 2.0s.
+- **Global Codex Skills count**: **42** present under `~/.codex/skills/`.
+
+### Next Steps
+- Restart Codex to pick up newly installed skills.
+- Review `AGENT_SKILLS_INVENTORY.md` for recommended future additions.
+
+---
+
+
+
+### Objective
+Finalize and verify the transition of AgentShield to a production-grade Agent Runtime Security Platform. Run unit tests, verify frontend builds, and launch the dev servers.
+
+### Changes Made
+
+#### `backend/app/contracts.py`
+- Deduplicated `requests_screened`, `threats_blocked`, `policy_violations`, and `last_seen` fields in `AgentResponse` model.
+- Deduplicated `active_sdk_key_exists` field in `AgentListResponse` model.
+
+#### `frontend/src/main.tsx`
+- Modified the Audit `LedgerPage` to support collapsible, interactive rows. Clicking a row expands it to reveal:
+  - Clean structured fields showing Verdict, Reason, Confidence, Affected Tool, and Action.
+  - A collapsible `<details>` panel housing the technical raw JSON evidence.
+
+### Verification
+- **Automated Tests**: Ran `uv run python -m unittest discover -s tests` - all 39 tests successfully completed and passed (`OK`).
+- **Frontend Compiler**: Ran `npm run build` in `frontend` - production compilation completed successfully (0 errors, 443 modules transformed).
+- **Runtime Servers**: Spawned FastAPI (`uvicorn` port 8000) and React frontend (`vite` dev server port 5173) in separate macOS terminal windows using the `run_website.sh` launcher script. Checked endpoints (`/health` and `/` index page) via curl - both servers are responding and healthy.
+
+---
+
+## Session Update - 2026-06-03 (Dashboard UX Overhaul)
+
+### Objective
+Complete UX redesign based on user feedback: replace engineer-facing metrics dashboard with actionable, product-quality UI that immediately communicates security value.
+
+### Changes Made
+
+#### `frontend/src/main.tsx`
+
+**Dashboard (complete redesign)**
+- Replaced meaningless counter metrics (`Agents Protected = 0`, `Threats Blocked = 1`, etc.) with three meaningful cards:
+  - **Protection Status**: 🟢 Protected / 🟡 Setup Required / 🔴 No Agent Connected — determined by `liveConnectedCount` and `data.apiKeys.length`.
+  - **Last Security Event**: Shows the last BLOCKED/FLAGGED event with Agent, Timestamp, verdict badge, and "View Evidence" CTA.
+  - **Time To First Protection**: `< 2m` once any attack is blocked; `—` until then.
+- Added a full-width **"Last Attack Blocked"** hero card as the first element: green gradient, attack name, agent, latency, ledger ID, and "View Evidence" button. Becomes a neutral "No attacks recorded yet" when clean.
+- Deleted `SecurityTelemetryChart` invocation and the entire "Workspace Status" / Event Feed / Threats panels that replaced it.
+- Preserved `proofResult` display (verification results).
+- Removed `liveProtectedEvents` and `liveThreats` variables (no longer needed without the chart).
+
+**Evidence Page (LedgerPage)**
+- Filtered to only `message` and `tool_call` event types (hides `auth`, `system`, `agent_spawn`, `sdk_key_created`).
+- BLOCKED rows now render with a red tinted border and red title color.
+- Row titles now include timestamp (e.g. `#42 · 2:14:03 PM`).
+
+**Protect Agent Page (ConnectAgentPage)**
+- Converted from flat layout to a **5-step wizard**:
+  1. Choose Framework — fixed-height cards (`height: 110px`), flex column layout, title top-aligned, description bottom-aligned.
+  2. Name Agent — name + environment inputs.
+  3. Create Package — issues real SDK key + registers agent.
+  4. Copy Code — pre-filled code with "Copy .env" / "Copy code" buttons.
+  5. Verify Protection — runs live enforcement + shows per-result cards with Evidence link.
+- Wizard progress bar with numbered circles (✓ for completed, current in dark, future faded).
+- Each step has Back/Next navigation.
+
+**Settings Page**
+- Removed the "Interactive Custom Cursor" toggle row entirely (both the UI and the surrounding border-top container div).
+
+### Verification
+- `npm run build` passed cleanly (✓ 443 modules transformed, no TS errors).
+
+### Architecture Notes
+- The `SecurityTelemetryChart` function (lines ~1463-1772) still exists in code but is no longer invoked. Can be deleted in a future cleanup pass.
+- `customCursor` state and `persistCustomCursor` function still exist (used by `loadSettings` to parse the API response), but the UI control is gone.
+
+---
+
+## Session Update - 2026-06-03 (Primary Journey Simplification)
+
+
+### Objective
+- Refactor the visible AgentShield product around one user journey: `Protect Agent -> Prove Protection -> View Evidence`.
+- Hide legacy pages from primary navigation without deleting their routes/code yet.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Sidebar now contains only:
+    - Dashboard.
+    - Protect Agent.
+    - Evidence.
+    - Settings.
+  - Removed these pages from visible navigation:
+    - Quick Start.
+    - Agents.
+    - Playground.
+    - Attack Sim.
+    - raw Ledger wording.
+  - Kept legacy/internal routes intact for Phase 2 validation and future deletion.
+  - Changed Dashboard from engineering metrics to outcome metrics:
+    - Agents Protected.
+    - Threats Blocked.
+    - Last Attack Blocked.
+    - Protection Status.
+  - Replaced the empty dashboard journey with:
+    - `No protected agents yet`.
+    - `Connect your first agent and block an attack in under 2 minutes.`
+    - Primary CTA: `Protect Agent`.
+  - Renamed `Connect Existing Agent` to `Protect Agent`.
+  - Converted the visible ledger route into `Evidence`:
+    - Human-readable proof cards by default.
+    - Event ID, verdict, source, agent, timestamp.
+    - `View Proof` expansion for ledger hash, previous hash, verification data, and raw JSON.
+  - Removed primary visible links into legacy pages from the dashboard.
+
+### Verification
+- `npm run build` passed.
+- Browser smoke on `http://127.0.0.1:5173` passed:
+  - Sidebar items were exactly `Dashboard`, `Protect Agent`, `Evidence`, `Settings`.
+  - Sidebar no longer showed `Quick Start`, `Agents`, `Playground`, or `Attack Sim`.
+  - Dashboard outcome copy rendered.
+  - Protect Agent page rendered with `Block the first attack`.
+  - Evidence page rendered with human-readable proof copy and no `Audit ledger` heading.
+
+## Session Update - 2026-06-03 (Connect Agent Adoption Funnel)
+
+### Objective
+- Continue the product shift from dashboard-first to adoption-first.
+- Add a first-class `Connect Agent` path that optimizes for the first blocked attack, not just agent creation.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Added `Connect Agent` to the sidebar and app router.
+  - Added a dedicated `ConnectAgentPage`.
+  - Added framework selector cards for:
+    - OpenAI Agents SDK.
+    - LangGraph.
+    - CrewAI.
+    - AutoGen.
+    - MCP Agent.
+    - Custom REST.
+  - Added connection setup fields for agent name and target environment.
+  - Added `Create connection package` action that:
+    - Creates a real one-time SDK API key via `POST /v1/api-keys`.
+    - Registers an agent identity when needed.
+    - Copies the real SDK key.
+    - Unlocks executable code snippets only after the real key and agent exist.
+  - Added exact generated snippets per framework with real `AGENTSHIELD_API_KEY`, base URL, and agent name.
+  - Added copy controls for env vars, code, and SDK key.
+  - Added `Verify installation` action that runs the existing proof endpoint and shows:
+    - Verification request count.
+    - Blocked attack count.
+    - Time to first block.
+    - `ALLOWED` benign prompt row.
+    - `BLOCKED` prompt-injection row.
+    - Ledger IDs with links to the ledger page.
+  - Changed the empty-dashboard primary CTA from Quick Start to `Connect Agent & Block First Attack`.
+
+### Verification
+- `npm run build` passed.
+- Browser smoke through signup and Connect Agent passed:
+  - Connect page rendered.
+  - No `AGENTSHIELD_API_KEY=Settings > SDK API Keys` text appeared.
+  - Creating a connection package showed a real `as_live_...` SDK key in executable snippets.
+  - Verification produced `ALLOWED` and `BLOCKED`.
+  - Verification showed `Time To First Block`.
+  - Verification displayed ledger IDs.
+- Existing console noise observed during repeated Playwright navigation:
+  - Expected logged-out `/auth/me` 401s.
+  - React `createRoot` warning from repeated dev-session navigation.
+  - Existing Firebase fallback 400 on signup.
+  - No Connect Agent flow blocker found.
+
+## Session Update - 2026-06-03 (Executable Quick Start Keys and No-Code Proof Center)
+
+### Objective
+- Fix the P1 UX bug where Quick Start rendered copyable code such as `AGENTSHIELD_API_KEY=Settings > SDK API Keys`.
+- Add a website-only proof path so non-technical users can see AgentShield allow a benign prompt, block a prompt injection, and write ledger entries without installing the SDK.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Quick Start now creates a real one-time SDK API key from `POST /v1/api-keys`.
+  - Quick Start no longer displays or copies executable snippets until a real one-time SDK key exists.
+  - When no SDK key exists, Quick Start shows a clear “Create & copy key” action and an explanatory empty state instead of fake credentials.
+  - Added a Dashboard “No-code proof center” card with a `Run Live Protection Test` button.
+  - The Proof Center displays allowed/blocked verdicts, prompt previews, latency, and direct ledger IDs after the test runs.
+  - Proof Center metrics are labeled separately from live SDK runtime metrics.
+- Updated `backend/app/main.py`:
+  - Added `POST /v1/proof/run`.
+  - The endpoint creates/reuses a hidden internal proof agent and runs two real prompt enforcement checks:
+    - Benign prompt -> expected `ALLOWED`.
+    - Prompt injection -> expected `BLOCKED`.
+  - Proof ledger rows use `event_data.source = "console_proof"`.
+  - The endpoint does not mark external SDK runtime traffic as live and does not affect live agent trust scores.
+  - Hidden internal proof agents are filtered out of the normal agent registry.
+
+### Verification
+- Source audit confirmed there are no executable snippets containing `AGENTSHIELD_API_KEY=Settings...`.
+- `npm run build` passed.
+- `python3 -m py_compile backend/app/main.py backend/app/services.py` passed.
+- Restarted backend and ran authenticated smoke through the frontend proxy:
+  - Signup succeeded.
+  - `POST /api/v1/proof/run` returned `source: "console_proof"`.
+  - Returned verdicts were `ALLOWED` and `BLOCKED`.
+  - Returned `protected_requests: 2` and `blocked_threats: 1`.
+  - Ledger contained the expected `console_proof` rows with latest verdicts `ALLOWED`, `BLOCKED`.
+- `python3 -m unittest discover -s tests -v` passed:
+  - 39 passed.
+  - 3 skipped because no disposable `AGENTSHIELD_TEST_DATABASE_URL` was configured.
+
+## Session Update - 2026-06-03 (Agent Registration Copy and Key Copy Controls)
+
+### Objective
+- Fix misleading post-registration copy that said an agent was protected before live SDK/API traffic existed.
+- Add clearer copy controls for agent identity values and SDK key workflows.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - `spawnAgent()` now returns the actual backend-created `Agent`, so the registration success modal can use the real `agent_id` and RS256 token instead of a stale placeholder.
+  - Changed post-registration copy from `<agent> is now protected. Your code is ready to run.` to truth-first copy: the agent is registered and protection begins after the first live SDK/API request.
+  - Added copy controls in the registration success modal for:
+    - Agent ID.
+    - Agent JWT/token.
+    - Integration snippet.
+  - Added an SDK key copy/create control to the agent SDK integration panel:
+    - Copies the key only when a real SDK key is present.
+    - Routes to Settings > SDK API Keys when the browser session does not expose a copyable SDK secret.
+  - Updated Quick Start copy controls:
+    - Added Copy key/Create key action in Step 2.
+    - Changed “registered & ready” copy to “registered” plus live-traffic requirement.
+  - Replaced remaining overclaiming empty-state copy from “No Protected Agents Registered” to “No Agents Registered.”
+  - Updated the public “How it works” step title from “Spawn a protected agent” to “Register an agent.”
+
+### Verification
+- `rg -n "now protected|Your code is ready|No Protected Agents|Spawn a protected|registered & ready|ready to run|protect every prompt" frontend/src/main.tsx frontend/src/Hero.tsx -S` returned no matches.
+- `npm run build` passed.
+- Browser smoke on `http://127.0.0.1:5173` confirmed the served logged-out DOM does not contain `is now protected` or `Your code is ready to run`.
+
+## Session Update - 2026-06-03 (Cursor Reliability Fix)
+
+### Objective
+- Fix intermittent cursor freezing/sticking reported by the user.
+- Preserve the animated cursor as an optional effect without making the whole app depend on it.
+
+### Root Cause
+- The frontend globally set `cursor: none` on `body`, buttons, links, and form controls before the React custom cursor was guaranteed to be active.
+- The custom cursor defaulted to enabled, so any animation failure, slow mount, unsupported pointer device, reduced-motion environment, or stale hover/click class could leave users with a hidden or visually stuck cursor.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Custom cursor now defaults to disabled and is opt-in from backend settings.
+  - Custom cursor only activates on fine-pointer hover devices and respects `prefers-reduced-motion`.
+  - Cursor state resets on window blur, page visibility changes, mouse leave, and mouse up/down cleanup.
+  - Uses `pointermove` for more reliable pointer tracking.
+  - Keeps `document.documentElement.dataset.customCursor` synchronized with the saved setting.
+- Updated `frontend/src/styles.css`:
+  - Native cursor is now the production-safe default.
+  - `cursor: none` only applies when `.custom-cursor-enabled` is present.
+  - Buttons, links, form controls, switches, tabs, and copy controls use normal native cursor values by default.
+- Updated `frontend/src/Hero.tsx`:
+  - Removed inline `cursor: none` from hero CTA buttons.
+
+### Verification
+- `npm run build` passed.
+- `python3 -m py_compile backend/app/main.py` passed.
+- Browser smoke on `http://127.0.0.1:5173`:
+  - Default state: `htmlClass=native-cursor`, `bodyCursor=auto`, `buttonCursor=pointer`, custom cursor nodes `0`.
+  - Opt-in state: `htmlClass=custom-cursor-enabled`, `bodyCursor=none`, custom cursor nodes `3`.
+  - Reset state returned to native cursor with custom cursor nodes `0`.
+- Console review showed only the expected unauthenticated `/api/v1/auth/me` 401 when logged out; no cursor-related runtime errors.
+
+## Session Update - 2026-06-03 (Persistence, Refresh Session, and Test DB Isolation Fix)
+
+### Objective
+- Fix the user-visible issue where refreshing after login could appear logged out and previous workspace data disappeared.
+- Ensure persisted user/agent data is stored in PostgreSQL and not browser local storage.
+- Prevent future verification/test runs from wiping the live development database.
+
+### Root Cause
+- `tests/test_integration_postgres.py` loaded `DATABASE_URL` from `backend/.env` and dropped all application tables during test setup.
+- This meant running `python3 -m unittest discover -s tests -v` could delete real local app data from the same Postgres database used by the running website.
+- The frontend also used the readable `csrf_token` cookie as a session-presence marker. That is fragile for deployed/cross-origin setups because the frontend may not be able to read the API-domain cookie even though the httpOnly session still exists.
+
+### Completed
+- Updated `tests/test_integration_postgres.py`:
+  - Postgres destructive integration tests now require `AGENTSHIELD_TEST_DATABASE_URL`.
+  - Tests skip if the variable is absent.
+  - Tests also skip if `AGENTSHIELD_TEST_DATABASE_URL == DATABASE_URL`.
+- Updated `backend/app/security/session.py`:
+  - Added `get_csrf_token_from_session()` to resolve CSRF from Redis/Postgres browser session storage.
+- Updated `backend/app/main.py`:
+  - Added `GET /v1/auth/csrf` to return the current session CSRF token for authenticated browser sessions.
+- Updated `frontend/src/api.ts`:
+  - Write requests now fetch `/v1/auth/csrf` if `csrf_token` is not visible in `document.cookie`.
+  - No local storage is used.
+- Updated `frontend/src/main.tsx`:
+  - Removed fragile refresh bootstrap check that required a readable `csrf_token` cookie.
+  - App now asks `/v1/auth/me` directly to restore the httpOnly cookie session.
+
+### Verification
+- Proxy-level persistence smoke:
+  - Signup through `http://127.0.0.1:5173/api/v1/auth/signup` returned 200.
+  - `GET /api/v1/auth/me` returned 200 after signup.
+  - `GET /api/v1/auth/csrf` returned 200.
+  - Agent creation returned 200.
+  - Re-checking `/auth/me` and `/agents` after refresh-equivalent requests returned the same workspace and `PersistAgent2`.
+- Ran `python3 -m unittest discover -s tests -v`:
+  - 39 tests passed.
+  - 3 destructive Postgres integration tests skipped because no disposable `AGENTSHIELD_TEST_DATABASE_URL` was set.
+  - The `PersistAgent2` workspace still existed after tests.
+- `npm run build` passed.
+- `python3 -m py_compile backend/app/main.py backend/app/security/session.py` passed.
+- `rg -n "localStorage|sessionStorage" frontend/src backend/app tests` returned no matches.
+- `/ready` returned `ready: true`, `store: postgres`, `database: connected`, `ledger_valid: true`.
+
+## Session Update - 2026-06-03 (Groq LLM Chat Activation & Prompt Tuning)
+
+### Objective
+- Stop the AgentShield Assistant from behaving like a keyword-matched bot for common/open-ended questions.
+- Ensure the configured Groq model is actually used for chat when `AGENTSHIELD_CHAT_LLM_ENABLED=true`.
+- Prompt-tune the assistant so messy user phrasing such as `how should is start` and `what u do` produces useful onboarding answers.
+
+### Completed
+- Updated `backend/app/settings.py` to explicitly load `backend/.env` before the generic `.env` lookup.
+  - This fixed the issue where the backend process started from project root did not reliably see `GROQ_API_KEY`.
+- Updated both Groq/OpenAI-compatible chat calls in `backend/app/main.py` to send a normal `User-Agent`.
+  - This fixed Groq Cloudflare `403 error code: 1010` for chat completions.
+- Prompt-tuned both `/v1/chat` and `/v1/chat/stream` system instructions:
+  - Interpret informal grammar naturally.
+  - Treat `how should is start` as onboarding intent.
+  - Treat `what u do` as assistant capability intent.
+  - Give a concrete 3-step start path.
+  - Handle frustration without scolding.
+  - Keep normal answers concise and grounded in live workspace state.
+
+### Verification
+- Direct Groq smoke with the same headers returned HTTP 200.
+- `/v1/chat` now returns `provider=groq`, `model=llama-3.3-70b-versatile` for open-ended prompts.
+- Verified sample prompts:
+  - `how should is start` -> 3-step onboarding path.
+  - `what u do` -> assistant capabilities.
+  - `can i connect my own langchain agent here?` -> relevant LangChain integration answer.
+  - `fuck this chatbot is broken` -> acknowledges frustration and asks for the broken area.
+- `python3 -m py_compile backend/app/settings.py backend/app/main.py` passed.
+- `npm run build` passed.
+- `python3 -m unittest discover -s tests -v` passed 39 tests.
+
+## Session Update - 2026-06-02 (Chatbot Fallback & Workspace Context Fix)
+
+### Objective
+- Fix the AgentShield Assistant behavior where casual, frustrated, or vague messages repeatedly returned the rigid fallback: `I need one specific AgentShield area to focus on`.
+- Ensure the chat widget uses the logged-in browser workspace instead of drifting to the first tenant or generic `current workspace`.
+
+### Completed
+- Updated `/v1/chat` and `/v1/chat/stream` in `backend/app/main.py`:
+  - Added session-aware chat workspace resolution using the browser session hash when no explicit API key is provided.
+  - Added clear fallback intents for casual greetings, `what do you do` / `what u do`, frustration/profanity, and low-signal gibberish.
+  - Replaced the repeated rigid fallback with a concise capability explanation.
+- Updated `frontend/src/main.tsx`:
+  - Chat stream requests now send `credentials: "include"` so httpOnly session cookies are available to the backend.
+
+### Verification
+- `python3 -m py_compile backend/app/main.py` passed.
+- `npm run build` passed.
+- `python3 -m unittest discover -s tests -v` passed 39 tests.
+- Browser chat smoke passed:
+  - Sent `what u do` through the visible chat widget.
+  - Network request `POST http://127.0.0.1:8000/v1/chat/stream` returned 200.
+  - Console had 0 errors.
+  - UI response correctly explained assistant capabilities and used the logged-in workspace name `Reality Audit Workspace 151016`.
+- Direct fallback smoke passed for:
+  - `heyy`
+  - `fuck`
+  - `shit`
+  - `what u do`
+  - `hj,j`
+  - `What does AgentShield do?`
+
+## Session Update - 2026-06-02 (Enterprise Product Reality Audit)
+
+### Objective
+- Act as a skeptical first-time enterprise buyer and audit AgentShield only through UI/network evidence before relying on code.
+- Verify onboarding, agent creation, SDK key issuance, simulation separation, real runtime protection, kill switch enforcement, persistence, and ledger proof.
+- Produce a durable report with screenshots, network evidence, pass/fail matrix, issue severities, and final verdict.
+
+### Completed
+- Created `/Users/lol/Documents/Agent Eval/PRODUCT_REALITY_AUDIT_2026-06-02.md`.
+- Captured screenshots for landing, signup, agent creation, pre-runtime evidence, SDK key creation, dashboard states, attack simulation, real runtime, behavior drawer, relogin, and ledger.
+- Verified real runtime behavior:
+  - Benign SDK-style request returned HTTP 200, `ALLOWED`.
+  - Prompt injection returned HTTP 200, `BLOCKED`, with trust score decay.
+  - Kill switch returned HTTP 200 for disable, and later protected request returned HTTP 401 `AUTH_AGENT_TOKEN_REVOKED`.
+  - Ledger remained verified with setup, simulation, live runtime, and kill-switch rows.
+- Verified simulator separation:
+  - Five attack simulation calls returned HTTP 200.
+  - Dashboard live counters remained zero after simulations.
+  - Ledger rows clearly displayed source `simulation`.
+
+### Key Findings
+- **P1:** Disabled agent still shows green `Live` connection even while lifecycle is `Disabled`.
+- **P1:** Dashboard hides historical live protected events/threats after kill switch, even though event feed and ledger still show live runtime evidence.
+- **P1:** Post-registration success copy says the agent is protected before SDK runtime traffic exists.
+- **P2:** Signup/login attempt Firebase first and log 400 console errors before backend fallback succeeds.
+- **P2:** Empty/pre-runtime dashboard shows `100% blocked` and `Active shielding`, which overclaims.
+- **P2:** REST integration details are incomplete; working runtime call required `X-AgentShield-Api-Key`, `Authorization: Bearer <agent token>`, and body `direction`.
+- **P2:** Dashboard does not auto-refresh after external SDK traffic; direct navigation was required to show updated live counters.
+
+### Verification
+- Browser/network audit using Playwright against `http://127.0.0.1:5173`.
+- Backend readiness was healthy: Postgres connected and ledger valid.
+- Final report verdict: **Ready For Staging**, not production.
+
+### Next Fix Order
+1. Disabled status must override live connection badges.
+2. Split current connection counters from historical protected-event evidence.
+3. Replace post-registration copy with `registered, awaiting SDK traffic`.
+4. Disable Firebase calls when backend auth is configured as primary.
+5. Remove empty-state `100% blocked` / `Active shielding` claims.
+6. Add exact REST/cURL SDK integration panel.
+7. Poll/stream dashboard updates after external SDK traffic.
+
 ## Session Update - 2026-06-02 (Runtime Gating Verification, Kill-Switch Enforcement, & E2E demo.py Proof)
 
 ### Objective
@@ -626,7 +1420,7 @@ Fix the three critical credibility failures identified in PROJECT_AUDIT.md + imp
 - Connect the Console Copilot chat assistant to a real generative model using the user's shared Groq API key, and construct a working Python SDK agent integration demo illustrating both native wrapping and LangChain callback setups.
 
 ### Completed
-- **Enabled Generative LLM Copilot**: Added the shared `GROQ_API_KEY=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`, set `AGENTSHIELD_CHAT_LLM_ENABLED=true`, and configured `GROQ_MODEL=llama-3.3-70b-versatile` inside the uvicorn environment (`backend/.env`). Restarted the backend server cleanly. The Console Copilot assistant now leverages real generative models using active security state context.
+- **Enabled Generative LLM Copilot**: Added a user-provided Groq key to the local untracked environment, set `AGENTSHIELD_CHAT_LLM_ENABLED=true`, and configured `GROQ_MODEL=llama-3.3-70b-versatile` inside the uvicorn environment (`backend/.env`). Restarted the backend server cleanly. The Console Copilot assistant now leverages real generative models using active security state context.
 - **Created Python Agent Integration Demo**: Built a fully functioning, self-healing demo script at [run_shielded_agent.py](file:///Users/lol/Documents/Agent%20Eval/scripts/run_shielded_agent.py):
   - Automatically bootstraps a demo developer workspace (or logs in to retrieve existing credentials on subsequent runs) to obtain a live workspace key.
   - Instantiates `AgentShield`, spawns a shielded agent, screens benign/malicious queries, gates permitted (`calculator:execute`) and unpermitted (`database_delete:write`) tools, and outputs a complete reference block for `AgentShieldLangChainCallback` integrations.
@@ -1951,3 +2745,953 @@ Add a fully-functional, dedicated **Personalization** settings tab that was miss
 - Do not store raw SDK keys after creation. The raw value should remain one-time only.
 - Do not list browser/session keys in the SDK key management table.
 - Future production improvement: add key-created-by user attribution and per-key scope selection UI.
+
+## Session Update - 2026-06-03
+
+### Objective
+- Set up a production-grade skills.sh environment for Codex, install only high-value skills, create the "Lakshya Engineering Stack" inventory, verify global Codex availability, and fix the surfaced frontend `Response body stream already read` error.
+
+### Completed
+- Installed the `skills` CLI globally.
+- Audited existing global Codex-visible skills under `/Users/lol/.codex/skills` and `/Users/lol/.agents/skills`.
+- Searched skills.sh marketplace for high-value engineering categories: architecture, React, FastAPI, PostgreSQL, testing, security, GitHub Actions, LangGraph, and Stripe.
+- Avoided bulk installing duplicate or low-value skills.
+- Installed three complementary marketplace skills globally for Codex:
+  - `vercel-react-best-practices`
+  - `github-actions-docs`
+  - `webapp-testing`
+- Rebuilt `AGENT_SKILLS_INVENTORY.md` with:
+  - active Lakshya Engineering Stack skills
+  - installed skill names and purposes
+  - source repositories
+  - dependencies
+  - potential conflicts
+  - marketplace candidates reviewed
+  - project-specific future recommendations for AgentShield, Hiring Wallah, AI agents, security platforms, SaaS, and YC-style startup work.
+- Fixed `frontend/src/api.ts` so failed API responses read the body once with `res.text()` and parse JSON from that text, instead of calling `res.json()` then `res.text()` on the same stream.
+
+### Files Modified
+- `AGENT_SKILLS_INVENTORY.md`
+- `frontend/src/api.ts`
+- `HANDOFF.md`
+
+### Architecture Decisions
+- Treat "Lakshya Engineering Stack" as a curated documented global bundle rather than installing every available skills.sh package.
+- Keep the practical active stack to high-value software engineering, full-stack, security, testing, debugging, GitHub, and DevOps skills.
+- Leave narrower LangGraph and Stripe skills as future installs until those implementation areas become active, avoiding unnecessary context and dependency bloat.
+
+### Dependencies Added
+- Global npm package: `skills` v1.5.10.
+- Global Codex skills:
+  - `/Users/lol/.agents/skills/vercel-react-best-practices`
+  - `/Users/lol/.agents/skills/github-actions-docs`
+  - `/Users/lol/.agents/skills/webapp-testing`
+
+### Verification
+- `command -v skills` returned `/Users/lol/.nvm/versions/node/v22.22.3/bin/skills`.
+- `skills --version` returned `1.5.10`.
+- `skills ls -g -a codex --json` confirmed the newly installed skills are globally visible to Codex.
+- `find /Users/lol/.codex/skills -maxdepth 2 -name SKILL.md -not -path '*/.system/*' | wc -l` returned `42`.
+- `find /Users/lol/.agents/skills -maxdepth 2 -name SKILL.md | wc -l` returned `3`.
+- `rg -n "\\.text\\(\\)|\\.json\\(\\)|Response\\(|clone\\(" frontend/src backend/app tests -S` identified the double-read error path in `frontend/src/api.ts`.
+- `cd frontend && npm run build` passed.
+- Targeted double-read search returned no matches.
+
+### Issues Found
+- `skills list` without `-g` reports no project skills because the requested setup is global, not project-local.
+- `github-actions-docs` had a Snyk Medium Risk assessment during installation; it was kept because Gen reported Safe and Socket reported 0 alerts, but the inventory flags it as a docs/reference skill to use carefully.
+- The CLI has no native named bundle command, so the bundle is represented by the inventory and global installations.
+
+### Pending Work
+- Restart Codex so newly installed global skills are loaded in future sessions.
+- Install LangGraph/CrewAI/MCP/Stripe-specific skills only when those feature areas become active implementation work.
+
+### Notes For Next Agent
+- Do not install all skills from skills.sh. Use the inventory's active stack first and add new skills only when they clearly reduce task risk or implementation time.
+- If a future skill install shows poor or unsafe security results, ask the user before proceeding.
+
+## Session Update - 2026-06-03 (Outcome-First AgentShield Journey)
+
+### Objective
+- Refactor the visible AgentShield console around the core user journey: protect an agent, prove protection, and view evidence.
+- Remove confusing primary navigation and move SDK key issuance into onboarding instead of Settings.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Sidebar now shows only `Dashboard`, `Protect Agent`, `Evidence`, and `Settings`.
+  - Legacy/internal routes for Agents, Playground, and Attack Lab remain available in code but are hidden from primary navigation.
+  - Replaced the dashboard with an activation-focused progress experience:
+    - Create Workspace.
+    - Register Agent.
+    - Generate SDK Key.
+    - Connect Runtime.
+    - First Protected Request.
+  - Added an explicit `What should I do now?` next-action card so the dashboard tells the user what to do next.
+  - Renamed visible onboarding from Quick Start to `Protect Agent`.
+  - Added real SDK API key creation inside the Protect Agent flow via `POST /v1/api-keys`.
+  - Gated executable integration snippets behind a newly created one-time SDK key so hidden existing keys never become fake copyable credentials.
+  - Changed registration copy to say the agent is registered and protection begins after the first live SDK/API request.
+  - Renamed Ledger to `Evidence` and made the default view human-readable:
+    - Time.
+    - Agent.
+    - Action.
+    - Verdict.
+    - View Proof.
+  - Moved ledger hashes and raw JSON behind the `View Proof` expansion.
+  - Renamed internal `Attack Sim` wording to `Attack Lab`.
+  - Removed SDK API Keys from visible Settings tabs.
+  - Removed the visible Interactive Custom Cursor setting and defaulted the custom cursor path off.
+- Updated `frontend/src/styles.css`:
+  - Added activation-dashboard, progress-step, outcome-card, next-action, and evidence-list styling.
+  - Added responsive behavior for activation and evidence views.
+
+### Files Modified
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `HANDOFF.md`
+
+### Architecture Decisions
+- Hide legacy pages instead of deleting them so existing code paths can be validated before removal.
+- Treat SDK keys as onboarding credentials, not Settings, because users need them while protecting an agent.
+- Keep cryptographic proof available but hidden behind human-readable evidence rows by default.
+- Keep custom cursor disabled by default because production security software should prioritize native reliability and trust.
+
+### Dependencies Added
+- None.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Source scan confirmed no remaining visible stale strings:
+  - `Settings > SDK`
+  - `is now protected`
+  - `Your code is ready`
+  - `No Protected Agents`
+  - `Interactive Custom Cursor`
+  - `Quick Start`
+  - `Attack Sim`
+- Backend readiness check returned `ready: true`, `store: postgres`, `database: connected`, and `ledger_valid: true`.
+- Playwright smoke through signup verified visible sidebar contains only:
+  - Dashboard.
+  - Protect Agent.
+  - Evidence.
+  - Settings.
+- Playwright smoke verified hidden sidebar items are absent:
+  - Quick Start.
+  - Agents.
+  - Playground.
+  - Attack Sim.
+- Playwright smoke verified dashboard includes activation progress and `What should I do now?`.
+- Playwright smoke verified Protect Agent can create a real `as_live_...` SDK key and no longer shows the old `Settings > SDK API Keys` placeholder.
+- Playwright smoke verified Settings does not show SDK API Keys or Interactive Custom Cursor, and does show Advanced Security.
+
+### Issues Found
+- The older dashboard, ledger, agents, playground, and attack components still exist after early-return/new-route hiding. They should be cleaned up after this simplified flow is accepted.
+- The generated code still depends on users running real SDK/API traffic before dashboard runtime metrics become meaningful.
+
+### Pending Work
+- Add a first-request verification button that runs a true SDK-style protected request from the generated connection package.
+- Build a real chat-style playground under Protect Agent only after a live connected agent exists.
+- Delete or extract legacy route code after validating no flows depend on it.
+
+### Notes For Next Agent
+- Do not re-add SDK key creation as a primary Settings tab. Keep key issuance inside onboarding or a future dedicated credentials step.
+- Keep the main journey focused on `Protect Agent -> First Protected Request -> Evidence`.
+
+## Session Update - 2026-06-04 (Activation-First UX Pass)
+
+### Objective
+- Address product critique that first-time users still saw empty metrics and did not know how to reach the first protected request.
+- Optimize the console around signup -> protect agent -> first protected request in under three minutes.
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Dashboard now makes pre-activation status dominant:
+    - `Agent not protected`.
+    - `No runtime traffic detected`.
+    - Clear next step CTA.
+  - Dashboard hides vanity zero metrics before the first protected runtime request.
+  - Pre-activation cards now show:
+    - Estimated Setup Time.
+    - Current Step.
+    - Next Action.
+    - Status: Awaiting Protection.
+  - Runtime metrics only appear after real protected runtime evidence exists.
+  - Protect Agent flow now follows the correct order:
+    1. Choose Framework.
+    2. Register Agent.
+    3. Generate SDK Key.
+    4. Copy Integration.
+    5. Verify Connection.
+  - Added framework cards for:
+    - OpenAI Agents.
+    - LangGraph.
+    - CrewAI.
+    - Google ADK.
+    - Custom Runtime.
+  - SDK key creation remains real via `POST /v1/api-keys`.
+  - Fixed a wizard race where SDK key creation stayed disabled immediately after registering an agent before parent data refresh completed.
+  - Verify Connection step now shows waiting/runtime-connected state with last seen, protected requests, and threats blocked.
+  - Evidence empty state now teaches what will appear:
+    - Agent receives prompt.
+    - Shield evaluates request.
+    - Tool decision occurs.
+    - Attack is blocked.
+    - Example records.
+  - Settings now shows `General`, `Personalization`, and collapsed `Advanced` by default, with advanced sub-tabs for Security, Webhooks, and Team.
+- Updated `frontend/src/styles.css`:
+  - Added stronger activation hero styling.
+  - Added Protect Agent stepper, framework cards, runtime status, and evidence education styles.
+  - Added responsive collapse for new activation/protect/evidence layouts.
+
+### Files Modified
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `HANDOFF.md`
+
+### Architecture Decisions
+- Continue hiding legacy pages instead of deleting them until the new activation path is accepted.
+- Treat pre-activation dashboard as guidance, not analytics.
+- Treat framework selection as the first onboarding decision because developers think in frameworks, not package managers.
+- Keep verification truthful: it waits for real runtime traffic instead of faking a connected state.
+
+### Dependencies Added
+- None.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned `ready: true`, `store: postgres`, `database: connected`, and `ledger_valid: true`.
+- Playwright signup smoke passed:
+  - Dashboard shows `Agent not protected` and `No runtime traffic detected`.
+  - Dashboard does not show `Agents Protected: 0` before activation.
+  - Dashboard shows `Estimated Setup Time`.
+  - Protect Agent shows framework cards for OpenAI Agents, LangGraph, CrewAI, Google ADK, and Custom Runtime.
+  - Protect Agent flow order includes Choose Framework, Register Agent, Generate SDK Key, Copy Integration, and Verify Connection.
+  - Real `as_live_...` SDK key is generated in the flow.
+  - Verify step shows waiting/runtime-connected state.
+  - Evidence page teaches expected evidence or shows proof records.
+  - Settings shows collapsed Advanced by default.
+
+### Issues Found
+- Full live runtime verification still depends on the user running the copied SDK/API code externally. The UI correctly waits instead of simulating connection.
+- Legacy unreachable route markup still exists and should be removed in a cleanup sprint after acceptance.
+
+### Pending Work
+- Add a dedicated Live Protection / Runtime page that streams incoming prompt decisions, tool decisions, verdicts, and ledger IDs in a human-readable timeline.
+- Add a true first-request verification helper that can be triggered from the generated connection package.
+- Remove legacy unreachable dashboard/onboarding route code once the activation flow is confirmed.
+
+### Notes For Next Agent
+- Preserve the product rule: pre-activation screens should guide action, not display empty analytics.
+- Do not show runtime metrics until real runtime evidence exists.
+
+## 2026-06-04 16:58 IST — Vigilance UI Pass
+
+### Completed
+- Updated `frontend/src/main.tsx`:
+  - Added frontend-only `ReadyStatus` and `useReadyStatus()` for the existing unauthenticated `/ready` endpoint.
+  - Dashboard now shows compact trust indicators from real readiness/workspace state:
+    - Ledger `Valid` / review state.
+    - Database `Connected` / checking state.
+    - SDK `Waiting` / `Ready`.
+  - Dashboard metrics now include small icons for current step, next action, coverage, and evidence without adding fake metrics.
+  - Protect Agent active flow now uses a desktop two-column layout:
+    - Left: current action/form/code/status.
+    - Right: `What happens next` activation checklist derived from real framework, agent, SDK key, runtime, and ledger state.
+  - Integration code block now includes:
+    - Framework badge.
+    - Top-right copy button.
+    - Line numbers.
+  - Verify Connection now uses a deployment-monitor status list:
+    - SDK Connected.
+    - First Request.
+    - Threat Analysis.
+    - Evidence Generated.
+  - Live Protection empty state now shows muted scaffolding rows for prompt/risk/tool/ledger flow without creating counts or events.
+  - Protection Coverage rows now have check icons and one-line descriptions.
+  - Enterprise now has Organization Health above Security Posture:
+    - `Critical` if `/ready` or ledger is unhealthy.
+    - `Setup Required` before live runtime traffic.
+    - `Healthy` only when readiness, ledger integrity, and live runtime evidence exist.
+  - Enterprise status labels now use green/orange/red status classes.
+- Updated `frontend/src/styles.css`:
+  - Added trust indicator row, metric icons, Protect Agent right rail, line-numbered code block, and deployment monitor styles.
+  - Changed Evidence lifecycle from node tracker to directional `Prompt → Risk → Decision → Verdict → Proof` flow.
+  - Added muted Runtime Decisions scaffolding styles.
+  - Added Organization Health styles.
+  - Reduced collapsed chat dominance: centered `360px`, `0.85` opacity, `52px` input-row target; expanded chat restores full opacity.
+  - Added responsive rules for single-column Protect Agent, mobile framework grid, mobile evidence flow, and mobile runtime scaffolding.
+
+### Files Modified
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `HANDOFF.md`
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Desktop Playwright QA at `1440x1000` passed:
+  - Dashboard trust indicators count: 3.
+  - Trust text: Ledger Valid, Database Connected, SDK Waiting.
+  - Dashboard metric icons count: 4.
+  - Collapsed chat width: `360px`; opacity: `0.85`.
+  - Protect Agent desktop layout: two columns (`692px 300px` in QA run).
+  - Framework tiles were equal size: `129x148` each, five tiles on one row.
+  - Runtime scaffold rows count: 4.
+  - Runtime timeline min-height: `700px`.
+  - Coverage rows show Prompt Injection, Tool Abuse, Data Exfiltration, and Agent Spoofing with descriptions.
+  - Evidence lifecycle renders as Prompt, Risk, Decision, Verdict, Proof.
+  - Enterprise Organization Health showed `Setup Required` before live runtime evidence, not a fake healthy score.
+  - Enterprise statuses used `ready` and `pending` classes.
+- UI key/code QA passed:
+  - Registered a valid `research_agent` through the UI.
+  - Generated a real `as_live_...` SDK key through the UI.
+  - Integration code rendered 17 line-numbered rows.
+  - Framework badge rendered `OpenAI Agents`.
+  - Copy Code button rendered.
+  - Verify Connection deployment monitor showed:
+    - SDK Connected: done.
+    - First Request: waiting.
+    - Threat Analysis: waiting.
+    - Evidence Generated: waiting.
+- Mobile Playwright QA at `390x844` passed:
+  - Trust indicators count: 3.
+  - Chat width: `358px`; opacity: `0.85`; centered.
+  - Protect Agent layout collapsed to one column.
+  - Framework grid collapsed to one column.
+  - Runtime scaffold rows count: 4.
+  - Runtime timeline min-height: `520px`.
+
+### Issues Found
+- Full live runtime verification still requires an external SDK/API request. The UI correctly waits instead of simulating that state.
+- Legacy unreachable route markup still exists below the active `QuickStartPage` return and should be deleted after the primary flow is accepted.
+
+### Notes For Next Agent
+- Do not add fake organization health scores before live runtime traffic exists.
+- Keep runtime scaffolding visually muted and never count it as evidence.
+- If testing agent creation through the API, use a backend-accepted type such as `research_agent`; `qa_agent` returns validation error.
+
+## 2026-06-04 - Real-Value Pass For Evidence, Live Protection, Enterprise
+
+### User Request
+User called out that Enterprise, Evidence, and Live Protection were still mostly text and did not provide real value. The goal was to make those pages useful from real workspace/backend state, not add showoff/demo data.
+
+### Changes Made
+- Updated `frontend/src/main.tsx`:
+  - Evidence now has a real value strip:
+    - Total records.
+    - Runtime evidence.
+    - Security findings.
+    - Ledger chain status.
+  - Evidence now has real search/filter controls:
+    - Search by agent/event/hash/source/classification.
+    - Source filter.
+    - Verdict filter.
+  - Evidence now has an investigation queue backed by actual ledger entries.
+  - Empty Evidence state now shows a readiness checklist from real app state:
+    - Agent registered.
+    - SDK key available.
+    - Runtime connected.
+    - Ledger chain.
+  - Live Protection now has a Runtime Operations section backed by actual registered agents:
+    - Waiting agents.
+    - Live-connected agents.
+    - Disabled agents.
+    - Agent row with lifecycle, last seen, requests, blocked count, and next action.
+  - Enterprise now has real action panels:
+    - Readiness gaps derived from current settings/team/webhook/KMS/SSO state.
+    - Agent coverage table from actual registered agents and permission manifests.
+  - Removed a redundant route-level `shield.reload()` effect that caused extra API traffic during navigation. Mutation reloads and Live Protection polling remain.
+- Updated `frontend/src/styles.css`:
+  - Added styling for Evidence value strip, investigation toolbar/list, empty readiness checklist.
+  - Added styling for Runtime Operations metrics and agent table.
+  - Added styling for Enterprise action grid, readiness gap rows, and agent coverage.
+- Updated `backend/app/services.py`:
+  - Fixed Postgres dict-row access in `_agent_response`.
+  - The endpoint was using `row[0]` for Postgres query results, which caused `GET /v1/agents` to return `500` after agent creation.
+  - Count/max queries now use SQL aliases and dict keys:
+    - `cnt` for requests/threats/policy violations.
+    - `last_seen` for latest live runtime event.
+
+### Verification
+- Restarted backend on `http://127.0.0.1:8000`.
+- Frontend dev server remained on `http://127.0.0.1:5173`.
+- `cd frontend && npm run build` passed.
+- `/ready` after restart returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Browser QA at `1440x1000`:
+  - Signup succeeded through backend session auth.
+  - Registered `Final QA Agent` through Protect Agent.
+  - `GET /api/v1/agents` returned `200` with 1 real agent.
+  - Live Protection showed 1 real runtime operations row for `Final QA Agent`.
+  - Enterprise showed 1 real agent coverage row and real setup-required posture.
+  - Evidence showed:
+    - 1 total record.
+    - 1 runtime/evidence value strip.
+    - 1 investigation queue.
+    - Real auth/registration ledger event with `View Proof`.
+- Mobile QA at `390x844`:
+  - App rendered without blank page or framework overlay.
+
+### Issues Found / Still Open
+- Firebase signup is still attempted first when Firebase config is present and returns a visible network `400` before backend fallback succeeds. This is not blocking signup, but it is a console-quality issue.
+- `GET /v1/auth/csrf` returns `401` before signup because there is no session yet. It does not block signup, but it still appears in network QA.
+- Full “protected” runtime state still requires a real SDK/API request. UI now correctly shows registered/waiting state instead of claiming protection.
+
+## 2026-06-05 - Protect Agent Activation Truthfulness Fix
+
+### User Request
+User reported that after only completing website-side Protect Agent steps, the UI said setup was `100% complete` even though no external SDK/API runtime was connected. User also requested alignment cleanup.
+
+### Changes Made
+- Updated `frontend/src/main.tsx`:
+  - Added strict `isLiveRuntimeEntry()` helper.
+  - Dashboard and Evidence runtime counts now count only ledger entries with `source === "live_runtime"`.
+  - Protect Agent stepper no longer displays static `20/40/60/80/100% Complete` labels.
+  - Final step renamed from generic verification to `First Protected Request`.
+  - Final step completion now requires real runtime evidence:
+    - `agent.live_connected`, or
+    - `requests_screened > 0`, or
+    - `last_live_at`, or
+    - a matching `live_runtime` ledger entry.
+  - Integration-copy completion is now persistent for the current onboarding flow instead of tied to the short-lived copied-toast state.
+  - Added activation meter text explaining that live protection starts only after a real SDK/API request.
+- Updated `frontend/src/styles.css`:
+  - Tightened Protect Agent vertical rhythm.
+  - Equalized framework tile sizing/alignment.
+  - Added aligned activation meter styles.
+  - Moved meter bar under the activation text instead of floating far right.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Browser QA at `1440x1000` followed website-only path:
+  - Signup.
+  - Protect Agent.
+  - Register agent.
+  - Create SDK key.
+  - Copy integration code.
+  - Move to final verification step.
+  - Did not send any SDK/API runtime request.
+- Result:
+  - Protect Agent showed `80% activation`, not `100%`.
+  - Final step showed `Waiting for runtime`.
+  - Deployment monitor showed:
+    - SDK Connected: done.
+    - First Request: pending.
+    - Threat Analysis: pending.
+    - Evidence Generated: pending.
+    - Protected requests: `0`.
+  - Framework cards were equal-sized in QA: `123x181` each on the same row.
+  - Activation meter and progress bar share the same left edge after alignment cleanup.
+
+### Notes For Next Agent
+- Do not treat `registered`, `console`, `console_proof`, `simulation`, or setup/auth ledger events as live runtime evidence.
+- Website-only onboarding can complete through SDK key and code copy, but must stop before protected/runtime completion.
+
+## 2026-06-05 - CTA, Live Protection, Evidence, Enterprise Value Pass
+
+### User Request
+User reported several product/value and alignment issues:
+- SDK key name input was too narrow.
+- Copy Integration next button felt detached.
+- Final Protect Agent step sent users back to Dashboard instead of giving useful next actions.
+- Live Protection needed useful CTAs and real registered-agent controls.
+- Evidence was showing registration/setup entries but not clearly distinguishing live runtime evidence.
+- Enterprise still felt low-value and poorly arranged.
+
+### Changes Made
+- Updated `frontend/src/main.tsx`:
+  - Protect Agent:
+    - SDK key name input now has a placeholder and wider layout support.
+    - Copy Integration now has a boxed next-action panel explaining what to do after pasting code.
+    - Final verification step now shows three useful CTA cards:
+      - Copy integration again.
+      - Open Live Protection.
+      - Open Evidence.
+    - Removed the low-value `Back to Dashboard` CTA from the final verification state.
+  - Live Protection:
+    - Added a real CTA grid:
+      - Connect waiting agents.
+      - Watch decisions.
+      - Review proof.
+    - “Connect another agent” is now a proper boxed/button treatment.
+    - Runtime agent table now includes all registered agents with actions:
+      - Copy ID.
+      - Edit policy disabled honestly because backend manifest update API is not implemented.
+      - Disable, wired to the existing real revoke/disable flow.
+  - Evidence:
+    - Added dedicated `Live Runtime Evidence` section.
+    - If no live SDK/API request exists, Evidence now explicitly says registration evidence exists but runtime proof has not started.
+    - Live evidence filtering only uses `source === "live_runtime"`.
+  - Enterprise:
+    - Added enterprise next-action cards:
+      - Start runtime proof.
+      - Configure SIEM export.
+      - Add security reviewers.
+      - Open Evidence.
+    - Changed duplicate giant `Setup Required` on the right side into a small `Action needed` badge.
+- Updated `frontend/src/styles.css`:
+  - Widened SDK key creation row.
+  - Added boxed styles for integration next panel, final verification CTAs, Live Protection CTAs, Evidence live panel, and Enterprise command cards.
+  - Tightened Live Protection vertical spacing so the registered-agent table is visible earlier.
+  - Added table action styles and disabled-state handling for unavailable edit policy action.
+  - Added responsive fallbacks for new CTA grids and live evidence rows.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- Backend `/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Browser QA at `1440x1000`:
+  - Signup and Protect Agent registration worked.
+  - Protect Agent final step showed useful CTA cards and still stayed at `80% activation` before live runtime traffic.
+  - Live Protection showed:
+    - Real registered agent row.
+    - Copy ID enabled.
+    - Edit policy disabled honestly.
+    - Disable enabled.
+    - CTA cards for connect/watch/review.
+  - Evidence showed:
+    - `0 Runtime evidence`.
+    - Dedicated `Live Runtime Evidence` section.
+    - Clear message that registration evidence exists but runtime proof has not started.
+  - Enterprise showed action cards and no longer duplicated large `Setup Required` status.
+- SDK key input width verified at ~406px in desktop QA, enough for the default `First agent SDK key` value.
+
+### Remaining Issues
+- Centered floating chat can still visually cover lower content at the bottom of the viewport. Primary CTAs were moved above the overlap, but a future pass should reserve stronger dock-safe space or make the dock less intrusive on console pages.
+- Real manifest editing is not implemented. UI now exposes this honestly as a disabled `Edit policy` action rather than faking edit support.
+- Firebase signup still produces a visible network `400` before backend fallback succeeds when Firebase config is present.
+- Pre-signup CSRF check still returns `401` before session creation; non-blocking but noisy in network QA.
+
+## 2026-06-05 - Manifest Editing, Auth Noise, and Live Runtime Verification
+
+### User Request
+User asked to fix the remaining credibility and production-value gaps:
+- Real manifest editing API/UI instead of disabled `Edit policy`.
+- Chat dock overlap on lower page content.
+- Firebase signup noisy `400` before backend fallback.
+- Pre-signup CSRF noisy `401`.
+- First external SDK/API runtime request path and live evidence verification.
+
+### Changes Made
+- Backend:
+  - Added `AgentUpdateRequest` contract for name/type/permission manifest updates.
+  - Added `PUT /v1/agents/{agent_id}`.
+  - Implemented tenant-scoped manifest update service.
+  - Persisted changed name/type/permissions through Postgres agent upsert.
+  - Wrote `agent_policy_updated` audit ledger entries with previous and updated permissions.
+- Frontend auth:
+  - Email/password signup and login now call backend auth directly.
+  - Firebase is used only for Google sign-in, removing the noisy email/password Firebase `400`.
+  - CSRF preflight is skipped for pre-session auth writes (`signup`, `login`, `session`, `firebase-verify`), removing the harmless pre-signup `401`.
+- Frontend Protect Agent:
+  - Added `Run live API verification` CTA in the final step.
+  - The CTA uses the newly issued SDK key plus agent JWT against `/v1/shield/analyze`.
+  - It sends one benign request and one prompt-injection request through the real SDK/API auth path.
+  - Successful verification reloads workspace data and reports that evidence was written to the ledger.
+- Frontend Live Protection:
+  - Enabled real `Edit policy`.
+  - Added inline manifest editor for agent name, type, and permission JSON.
+  - Saving calls `PUT /v1/agents/{agent_id}` and reloads live data.
+  - Preserved real disable/revoke and Copy ID actions.
+- Frontend layout:
+  - Increased bottom page padding and reduced collapsed chat dock size/height to reduce lower-content overlap.
+  - Added responsive styles for the runtime policy editor.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- `python3 -m py_compile app/main.py app/services.py app/contracts.py app/store.py` passed.
+- Backend `/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Browser QA at `1440x1000`:
+  - Signup completed without Firebase `400` or CSRF `401` noise.
+  - Registered `ResearchAgent`.
+  - Created a real SDK key.
+  - Ran `Run live API verification`.
+  - Verification produced:
+    - Benign request: `ALLOWED`.
+    - Prompt injection request: `BLOCKED`.
+    - Live runtime evidence written to the ledger.
+    - Live Protection showed runtime connected, 2 protected requests, and 1 threat blocked.
+  - Edited the agent permission manifest from Live Protection and saved it successfully.
+  - Evidence showed live runtime evidence separately from setup/registered events.
+
+### Notes
+- The live API verification is real AgentShield SDK/API traffic and is classified as `live_runtime`; it is not fake dashboard data.
+- A separately deployed third-party/customer agent app still needs to be connected for true external production validation beyond the built-in verification CTA.
+- The chat dock is less intrusive now, but a fixed floating assistant can still cover content if a page intentionally places important controls at the viewport bottom. Keep primary CTAs above the dock-safe area.
+
+## 2026-06-05 - External Demo Agent, Chat Launcher, and Staging Prep
+
+### User Request
+User asked to finish the remaining items:
+- Connect a real external customer/demo agent app, not only the built-in browser verification CTA.
+- Deploy staging and verify the same flow on the hosted URL.
+- Make chat zero-overlap by collapsing it to a tiny launcher except when opened.
+
+### Changes Made
+- Added `scripts/external_demo_agent.py`:
+  - Runs as a separate terminal process outside the browser.
+  - Reads `AGENTSHIELD_API_KEY`, `AGENTSHIELD_BASE_URL`, `AGENTSHIELD_AGENT_NAME`, `AGENTSHIELD_ALLOWED_TOOL`, and `AGENTSHIELD_ALLOWED_ACTION`.
+  - Uses the local Python SDK client.
+  - Resolves or creates the named agent.
+  - Sends one benign prompt, one blocked prompt injection, one allowed tool call, and one blocked unauthorized tool call.
+  - Fetches `/v1/agents/{agent_id}/runtime-evidence`.
+  - Verifies `/ready` ledger integrity.
+- Updated Protect Agent UI:
+  - Final verification step now offers `Run external demo agent`.
+  - The CTA copies an executable command using the real one-time SDK key and selected agent/tool values.
+  - Kept the built-in API verification as a separate quick sanity check, not the only proof path.
+- Updated chat dock:
+  - Collapsed state is now a compact `Assistant` launcher button.
+  - The full input/history surface renders only after click/focus.
+  - This avoids the previous wide collapsed input overlapping lower page content.
+- Added staging deployment support:
+  - FastAPI now serves `frontend/dist` when present, allowing a single Docker web service to host both console and API on one origin.
+  - Added `render.yaml` for a Docker staging web service with explicit required secrets/env values.
+  - Added `docs/STAGING_DEPLOYMENT.md` with required Postgres/Redis/env setup and verification steps.
+  - Added missing clean-build dependencies to `pyproject.toml`: `python-dotenv` and `httpx`.
+  - Updated `uv.lock`.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- `python3 -m py_compile backend/app/main.py scripts/external_demo_agent.py sdk/python/agentshield/client.py` passed.
+- `uv lock` completed and added the missing runtime dependencies.
+- Backend restarted locally and `/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- External demo-agent proof passed against a fresh workspace:
+  - Agent identity resolved.
+  - Benign prompt allowed.
+  - Prompt injection blocked.
+  - Allowed manifest tool call passed.
+  - Unauthorized `database_delete:write` tool call blocked.
+  - Runtime evidence recorded: `requests=4`, `blocked=2`, `active=True`.
+  - Ledger verified.
+- Browser QA at `1440x1000`:
+  - Public page collapsed chat is a 120px launcher and expands only after click.
+  - Signup + Protect Agent flow reached the final step.
+  - `Run external demo agent` text rendered.
+  - `Copy command` button rendered.
+  - No Firebase `400` or pre-signup CSRF `401` responses were observed.
+
+### Staging Status
+- Vercel and Netlify CLIs are authenticated locally, but this app should not be deployed as frontend-only.
+- No `RENDER_*`, `DATABASE_URL`, `REDIS_URL`, `NEON_*`, or `UPSTASH_*` deployment env vars were available in the shell.
+- Docker is not installed locally, so the Docker image could not be built on this machine.
+- Staging deployment is prepared but not completed. To complete it, provide a real hosting target with durable Postgres and Redis values, then deploy the Docker service using `render.yaml` or equivalent.
+
+### Remaining Work
+- Complete hosted staging after real provider/env credentials are available:
+  - Managed Postgres URL.
+  - Managed Redis URL.
+  - Strong `API_KEY_PEPPER`.
+  - Strong `KEY_ENCRYPTION_KEY`.
+  - Correct `JWT_ISSUER`, `ALLOWED_ORIGINS`, and `FRONTEND_URL`.
+- Run the same external demo-agent proof against the hosted staging URL after deployment.
+
+## 2026-06-05 - Free Staging Provider Credential Attempt
+
+### User Request
+User asked to find free staging resources and get the needed URLs/keys autonomously.
+
+### What Was Tried
+- Checked local provider tooling:
+  - Vercel CLI is authenticated.
+  - Netlify CLI is authenticated.
+  - Railway CLI exists but is not authenticated.
+  - Neon, Upstash, Render, and Supabase CLIs are not installed/authenticated.
+- Provisioned a temporary no-signup Upstash Redis REST database:
+  - Credentials were written to local `.env.staging.local`.
+  - The temporary database expires on 2026-06-08 unless claimed.
+  - This endpoint is REST-based and is not directly compatible with AgentShield's current `REDIS_URL` / `redis-py` TCP usage.
+- Attempted Neon no-signup Launchpad Postgres via:
+  - `npx -y neondb -y --env .env.staging.local --key DATABASE_URL`
+  - `npx -y neondb --yes --env .env.staging.local --key DATABASE_URL`
+  - Both attempts failed provider-side with `Failed to create database`.
+- Checked Neon CLI auth support:
+  - Neon CLI requires browser OAuth or an API key.
+  - No existing Neon config/token was present under `~/.config/neonctl`.
+
+### Local Env File
+- Created `.env.staging.local` with:
+  - Generated `API_KEY_PEPPER`.
+  - Generated `KEY_ENCRYPTION_KEY`.
+  - Temporary Upstash REST credentials.
+  - Empty placeholders for `DATABASE_URL`, `REDIS_URL`, hosted URL origins, and optional LLM/search keys.
+- File permissions set to `600`.
+- This file is intentionally untracked and must not be committed.
+
+### Current Blocker
+- A real staging deployment still needs a durable Postgres `DATABASE_URL`.
+- Free options require one of:
+  - Successful Neon Launchpad creation, which failed provider-side in this run.
+  - Neon OAuth/API key setup.
+  - Supabase account/project setup.
+  - Another claimed free Postgres provider.
+- Redis also needs either:
+  - A TCP `rediss://...` URL from a claimed Upstash/Redis provider, or
+  - Code changes to support Upstash REST commands for rate limiting/session storage.
+
+## 2026-06-05 - Vercel + Neon Staging Deployment
+
+### User Request
+User asked to use Vercel and Neon for staging and approved login if needed.
+
+### Changes Made
+- Added Vercel serverless support:
+  - `api/index.py` wraps the FastAPI app and strips `/api` before routing to `/v1`, `/ready`, and `/health`.
+  - `vercel.json` builds `frontend`, serves `frontend/dist`, and rewrites API routes to `api/index.py`.
+  - `requirements.txt` lists Python runtime dependencies for Vercel.
+- Fixed deployment build:
+  - Initial `pip install .` failed because setuptools detected multiple top-level packages in the monorepo.
+  - Changed Vercel install command to `python3 -m pip install -r requirements.txt && cd frontend && npm ci`.
+- Provisioned Neon:
+  - Completed Neon OAuth through `neonctl`.
+  - Existing org is Vercel-managed, so direct project creation was restricted.
+  - Created isolated `agentshield` database inside existing Neon project `dawn-violet-85315655`.
+  - Retrieved pooled Neon connection string and set it as Vercel `DATABASE_URL`.
+- Configured Vercel production env:
+  - `DATABASE_URL`
+  - `API_KEY_PEPPER`
+  - `KEY_ENCRYPTION_KEY`
+  - `DEMO_MODE=false`
+  - `SIGNING_KEY_PROVIDER=local`
+  - `JWT_ISSUER=https://agentshield-sigma.vercel.app`
+  - `JWT_AUDIENCE=agentshield-agents`
+  - `ALLOWED_ORIGINS`
+  - `FRONTEND_URL`
+  - `ALLOW_UNVERIFIED_FIREBASE_AUTH=false`
+  - `AGENTSHIELD_CHAT_LLM_ENABLED=false`
+- Fixed runtime bug:
+  - Vercel `/api/v1/agents` returned 500 because `KEY_ENCRYPTION_KEY` was URL-safe random text, but the key provider requires exactly 64 hex characters.
+  - Replaced it with `secrets.token_hex(32)` locally and in Vercel.
+- Fixed HTTPS SDK portability:
+  - Python SDK and `scripts/external_demo_agent.py` now use `certifi` for HTTPS certificate verification when available.
+- Updated `docs/STAGING_DEPLOYMENT.md` with the actual Vercel + Neon deployment shape.
+
+### Hosted Deployment
+- Production URL: `https://agentshield-sigma.vercel.app`
+- Latest deployment URL: `https://agentshield-6s3xbni4k-lakshyakguptas-projects.vercel.app`
+- Inspector: `https://vercel.com/lakshyakguptas-projects/agentshield/C4G4nQMUrDLF4RJ9sPa9Co299Lbb`
+
+### Verification
+- `curl -fsS https://agentshield-sigma.vercel.app/api/ready` returned:
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Hosted page `GET https://agentshield-sigma.vercel.app` returned built Vite HTML.
+- Full hosted external demo-agent proof passed:
+  - Workspace signup succeeded.
+  - Hosted agent registration succeeded.
+  - Hosted SDK key issuance succeeded.
+  - External demo agent connected to `https://agentshield-sigma.vercel.app`.
+  - Benign prompt allowed.
+  - Prompt injection blocked.
+  - Allowed `web_search:read` tool call passed.
+  - Unauthorized `database_delete:write` tool call blocked.
+  - Runtime evidence recorded: `requests=4`, `blocked=2`, `active=True`.
+  - Ledger verified with hosted entries.
+
+### Remaining Staging Gap
+- Redis is not configured on Vercel staging.
+  - Browser sessions persist through Postgres.
+  - Rate limiting uses the in-process fallback per serverless instance.
+  - For production, add a claimed Upstash TCP `rediss://...` URL or implement an Upstash REST adapter.
+
+## 2026-06-06 - Hosted Startup + Enterprise Reality Audit
+
+### User Request
+Act as both a startup buyer and an enterprise buyer, use the hosted AgentShield platform with real agents/traffic, identify what works and what does not, and suggest improvements across frontend, backend, user flow, and features.
+
+### Changes Made
+- Fixed a hosted frontend production bug where `frontend/.env` baked `VITE_API_URL=http://127.0.0.1:8000` into the production bundle.
+  - `frontend/src/api.ts` now ignores localhost `VITE_API_URL` values in production and falls back to same-origin.
+  - `frontend/src/main.tsx` applies the same production-safe API URL rule for legacy direct calls and generated snippets.
+- Redeployed Vercel production after the fix.
+  - Production alias: `https://agentshield-sigma.vercel.app`
+  - Latest deployment: `https://agentshield-pniqcau2j-lakshyakguptas-projects.vercel.app`
+  - Inspector: `https://vercel.com/lakshyakguptas-projects/agentshield/83Wy9xi1H9ho7eMu17k9yNsUJhdL`
+
+### Verification
+- Local frontend build passed:
+  - `cd frontend && npm run build`
+- Hosted readiness passed:
+  - `GET https://agentshield-sigma.vercel.app/api/ready`
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+- Hosted browser audit passed without console errors or request failures after the API URL fix.
+- Real hosted external SDK/API traffic passed:
+  - Workspace signup succeeded.
+  - UI-only registered agent remained `live_connected: false` with zero protected requests.
+  - SDK key issuance returned a real `as_live_...` key once.
+  - External Python SDK demo agent connected to `https://agentshield-sigma.vercel.app`.
+  - Benign prompt allowed.
+  - Prompt injection blocked.
+  - Allowed `web_search:read` tool call passed.
+  - Unauthorized `database_delete:write` tool call blocked.
+  - Ledger verified after runtime traffic.
+- Hosted kill switch enforcement passed:
+  - Live agent allowed a benign request before disable.
+  - Unauthorized tool call was blocked.
+  - `POST /v1/agents/{agent_id}/disable` returned `status: disabled` and `ledger_action: agent_revoked`.
+  - A later protected request with the old agent token failed with `AUTH_AGENT_TOKEN_REVOKED`.
+  - Ledger still verified after disable.
+
+### Audit Artifacts
+- Result JSON: `/tmp/agentshield-liveaudit-result.json`
+- External demo output: `/tmp/agentshield-liveaudit-external-demo.txt`
+- Screenshots:
+  - `/tmp/agentshield-liveaudit-landing.png`
+  - `/tmp/agentshield-liveaudit-dashboard-empty.png`
+  - `/tmp/agentshield-liveaudit-dashboard-registered-only.png`
+  - `/tmp/agentshield-liveaudit-dashboard-live.png`
+  - `/tmp/agentshield-liveaudit-live-protection.png`
+  - `/tmp/agentshield-liveaudit-evidence.png`
+  - `/tmp/agentshield-liveaudit-enterprise.png`
+  - `/tmp/agentshield-liveaudit-mobile-landing.png`
+
+### What Works Now
+- Startup activation path is real:
+  - Sign up.
+  - Register agent.
+  - Generate SDK key.
+  - Run external SDK/API traffic.
+  - See live runtime evidence.
+- Browser state is not local-only for core data:
+  - Users, agents, keys, ledger entries, and runtime evidence persisted in hosted Neon Postgres.
+  - Browser auth uses httpOnly session cookies.
+- Live runtime separation is working:
+  - A UI-only registered agent stayed registered/waiting and did not become live-protected without SDK/API traffic.
+  - A real SDK agent became live-connected only after protected traffic.
+- Enterprise page now has real posture:
+  - Organization health changed to `Healthy` only after readiness, ledger validity, and live runtime evidence were present.
+  - KMS/HSM, SSO, SIEM/webhooks, and audit export remain honestly marked as not configured / needs integration.
+
+### Remaining Issues Found
+- Dashboard/Live Protection count consistency:
+  - API metrics for the live audit reported `live_runtime_entries: 4` and `decisions_blocked: 2`.
+  - Visible Dashboard/Live metrics showed `Protected Requests: 3` and `Threats Blocked: 1` in the audited workspace.
+  - Evidence showed 4 runtime records, so the issue appears to be frontend aggregation or stale derived state.
+- Disabled agent metadata:
+  - Kill switch enforcement works, but the disabled/revoked agent still had `live_connected: true` in API metadata.
+  - Backend should clear live metadata or expose a computed connection status where revoked/disabled overrides live.
+- Mobile landing:
+  - Mobile screenshot renders a very tall page with large blank bands between sections.
+  - This is visual/layout debt, not a backend blocker.
+- Code hygiene:
+  - `backend/app/main.py` contains repeated `/v1/agents/{agent_id}/enable` route definitions.
+  - `backend/app/contracts.py` contains repeated fields in `AgentResponse` and `AgentListResponse`.
+- Deployment architecture:
+  - Vercel Python/FastAPI function works for HTTP API.
+  - Persistent WebSocket realtime (`/ws/events`) and continuous background outbox processing are not production-safe on this Vercel serverless shape.
+  - Redis is still not configured, so rate limiting is per-instance fallback.
+- Monitoring compatibility:
+  - `GET /` and `GET /api/ready` work.
+  - `HEAD /` and `HEAD /api/ready` return 405, which can break uptime monitors that use HEAD.
+
+### Recommended Next Work
+1. Fix metric consistency so Dashboard, Live Protection, Evidence, and `/v1/metrics` all agree on protected requests and blocked decisions.
+2. Clear or override `live_connected` when an agent is revoked/disabled.
+3. Clean duplicate route and Pydantic field definitions.
+4. Add a hosted Playwright E2E test that runs signup -> SDK key -> external SDK traffic -> evidence -> kill switch.
+5. Move realtime/background processing to a production-suitable worker/realtime service or replace WebSockets with polling/SSE that is compatible with the chosen host.
+6. Add Redis through a real `rediss://` provider or an Upstash REST adapter.
+7. Fix mobile public-page spacing.
+8. Add `HEAD` support for `/`, `/ready`, and `/api/ready`.
+
+## 2026-06-06 - Production Metric Consistency + Mobile Chat Fix
+
+### User Request
+Continue the hosted startup/enterprise audit, fix every real issue found, verify with real agents and hosted traffic, and keep the platform honest for both startup and enterprise buyers.
+
+### Changes Made
+- Fixed cross-page runtime metric inconsistency.
+  - Backend agent responses now derive `requests_screened` and `threats_blocked` from live runtime ledger decisions.
+  - Frontend Dashboard, Live Protection, Evidence, and Enterprise now share the same live-runtime ledger decision source.
+  - Evidence no longer mixes registration/setup ledger entries into runtime evidence counts.
+- Fixed disabled-agent truth.
+  - Revoked/disabled agents no longer compute as `live_connected`.
+  - Runtime evidence keeps historical protected request counts but marks disabled agents as not currently connected.
+  - The live agent list excludes revoked agents from active threat/connection posture.
+- Fixed uptime-monitor compatibility.
+  - Added `HEAD /health`, `HEAD /ready`, `HEAD /api/ready`, and frontend fallback HEAD support.
+- Cleaned backend duplication.
+  - Removed duplicate `AgentResponse` fields.
+  - Removed duplicate `/v1/agents/{agent_id}/enable` route definitions.
+- Improved hosted/public UI behavior.
+  - Mobile/public sections no longer force every section to a full viewport height.
+  - Collapsed mobile assistant is now an icon-only floating launcher; it expands to the full assistant on interaction.
+  - Production deploy aliases continue to use same-origin API calls instead of baked localhost URLs.
+
+### Verification
+- Local tests:
+  - `python3 -m unittest tests.test_security_core -v` passed: 29 tests.
+  - `python3 -m unittest discover -s tests -v` passed: 40 tests, 3 skipped because `AGENTSHIELD_TEST_DATABASE_URL` is not configured.
+  - `python3 -m compileall backend/app sdk/python/agentshield` passed.
+  - `cd frontend && npm run build` passed.
+- Hosted readiness:
+  - `GET https://agentshield-sigma.vercel.app/api/ready`
+  - `ready: true`
+  - `store: postgres`
+  - `database: connected`
+  - `ledger_valid: true`
+  - latest checked ledger entries: `45`
+- Hosted real runtime regression:
+  - New workspace signup succeeded.
+  - Created a UI-only registered agent; it correctly stayed not live.
+  - Issued a real one-time SDK key.
+  - External Python SDK traffic hit `https://agentshield-sigma.vercel.app`.
+  - Benign message allowed.
+  - Prompt injection blocked.
+  - Allowed `web_search:read` tool call allowed.
+  - Unauthorized `database_delete:write` tool call blocked.
+  - API metrics agreed before disable: `protected_requests=4`, `blocked_threats=2`, `live_connected=true`.
+  - Kill switch disabled the live agent; old token calls failed with revoked-token behavior.
+  - Historical evidence stayed intact after disable: `historical_protected_requests=4`, `blocked_threats=2`, `runtime_active=false`.
+  - A second live agent was connected after disabling the first; UI counters agreed across Dashboard, Live Protection, Evidence, and Enterprise:
+    - Dashboard: `Protected Requests 8`, `Threats Blocked 4`.
+    - Live Protection: `Protected Requests 8`, `Threats Blocked 4`.
+    - Evidence: `8 Runtime evidence`, `4 Security findings`.
+- Browser QA:
+  - Desktop `1440x1000` hosted smoke passed with no console errors or failed requests.
+  - Mobile `390x844` hosted smoke passed with no console errors or failed requests.
+  - Mobile assistant collapsed launcher measured `40x40`, label hidden, expanded assistant remains available.
+- Deployment:
+  - Production alias: `https://agentshield-sigma.vercel.app`
+  - Latest deployment: `https://agentshield-8iblyx5r2-lakshyakguptas-projects.vercel.app`
+  - Inspector: `https://vercel.com/lakshyakguptas-projects/agentshield/VbraEY9e9cRVkRbAkLa9jrVrdk93`
+
+### Current Honest Status
+- Startup buyer flow is real and usable:
+  - signup -> register agent -> issue SDK key -> send external SDK/API traffic -> view live evidence -> disable agent.
+- Enterprise buyer signals are partially real:
+  - ledger validity, Postgres persistence, runtime evidence, disabled-agent state, and investigation records are real.
+  - KMS/HSM, SSO/SCIM, SIEM export, audit export, and Redis-backed rate limiting remain not configured / needs integration.
+- The hosted architecture is staging-ready, not enterprise-production-ready:
+  - Vercel serverless works for HTTP API and same-origin frontend.
+  - Persistent WebSockets and background outbox processing need a proper worker/realtime host.
+  - Redis is not configured on production, so rate limiting uses fallback behavior.
+  - Postgres integration tests need a disposable `AGENTSHIELD_TEST_DATABASE_URL` in CI to stop being skipped.
