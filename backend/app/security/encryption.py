@@ -1,15 +1,29 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import os
 from typing import Any
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
-# Master Key Encryption Key (KEK) simulation
-# In production, this would be fetched from a secure KMS provider (e.g. AWS KMS, HashiCorp Vault)
-_MASTER_KEK = b"agent_shield_super_secure_kek_32"
+def _load_master_kek() -> bytes:
+    raw = os.getenv("KEY_ENCRYPTION_KEY", "").strip()
+    if not raw:
+        raise RuntimeError("KEY_ENCRYPTION_KEY is required for envelope encryption.")
+
+    try:
+        key = bytes.fromhex(raw)
+    except ValueError:
+        try:
+            key = base64.urlsafe_b64decode(raw + "=" * ((4 - len(raw) % 4) % 4))
+        except (binascii.Error, ValueError) as exc:
+            raise RuntimeError("KEY_ENCRYPTION_KEY must be 32 bytes encoded as hex or URL-safe base64.") from exc
+
+    if len(key) != 32:
+        raise RuntimeError("KEY_ENCRYPTION_KEY must decode to exactly 32 bytes.")
+    return key
 
 
 class EnvelopeEncryptor:
@@ -31,7 +45,7 @@ class EnvelopeEncryptor:
             salt=self.tenant_id.encode(),
             iterations=1000,
         )
-        return kdf.derive(_MASTER_KEK)
+        return kdf.derive(_load_master_kek())
 
     def encrypt(self, plaintext: str) -> str:
         """

@@ -59,9 +59,6 @@ def issue_agent_token(
     exp = now + timedelta(minutes=ttl_minutes)
     jti = str(uuid4())
     
-    from .key_provider import get_key_provider
-    provider = get_key_provider(settings)
-    
     use_kms = settings.signing_key_provider == "kms"
     kid = settings.kms_key_arn if use_kms else f"key-{tenant_id}"
     
@@ -80,6 +77,8 @@ def issue_agent_token(
     signing_input = f"{_b64url(json.dumps(header, separators=(',', ':')).encode())}.{_b64url(json.dumps(payload, separators=(',', ':')).encode())}"
     
     try:
+        from .key_provider import get_key_provider
+        provider = get_key_provider(settings)
         signature = provider.sign(tenant_id, signing_input.encode('utf-8'))
     except Exception:
         # Fallback to store active keys or private_key_pem (for tests)

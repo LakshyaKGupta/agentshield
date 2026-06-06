@@ -282,6 +282,8 @@ def get_key_provider(settings: "Settings") -> KeyProvider:
         keys_dir = (
             Path(keys_dir_str)
             if keys_dir_str
+            else Path("/tmp/agentshield-keys")
+            if os.getenv("VERCEL")
             else Path(__file__).resolve().parents[2] / ".keys"
         )
         enc_key = getattr(settings, "key_encryption_key", None) or None
