@@ -10,10 +10,25 @@
  * All callers should import { apiRequest, API_BASE } from "./api".
  */
 
+function isLocalDevHost(): boolean {
+  return ["5173", "5174", "5175"].includes(window.location.port);
+}
+
+function resolveDirectApiUrl(): string {
+  const configured = import.meta.env.VITE_API_URL as string | undefined;
+  const configuredIsLocal = Boolean(configured && /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(configured));
+
+  if (configured && (!import.meta.env.PROD || !configuredIsLocal)) {
+    return configured;
+  }
+
+  return isLocalDevHost()
+    ? `http://${window.location.hostname}:8000`
+    : window.location.origin;
+}
+
 /** Base URL for direct (non-proxied) usage, e.g. WebSocket connections. */
-export const API_DIRECT =
-  (import.meta.env.VITE_API_URL as string | undefined) ||
-  `http://${window.location.hostname}:8000`;
+export const API_DIRECT = resolveDirectApiUrl();
 
 /**
  * Prefix used for all fetch calls in dev.
@@ -28,6 +43,25 @@ function getCSRFToken(): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : "";
+}
+
+let cachedCSRFToken = "";
+
+async function resolveCSRFToken(): Promise<string> {
+  const cookieToken = getCSRFToken();
+  if (cookieToken) {
+    cachedCSRFToken = cookieToken;
+    return cookieToken;
+  }
+
+  const res = await fetch(`${API_BASE}/v1/auth/csrf`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) return "";
+  const payload = await res.json();
+  cachedCSRFToken = typeof payload?.csrf_token === "string" ? payload.csrf_token : "";
+  return cachedCSRFToken;
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -56,11 +90,14 @@ export async function apiRequest<T = unknown>(
 
   const isWriteMethod =
     init.method && !["GET", "HEAD", "OPTIONS"].includes(init.method.toUpperCase());
+  const isPreSessionAuthWrite =
+    isWriteMethod &&
+    /^\/v1\/auth\/(signup|login|session|firebase-verify)$/.test(path);
 
   const extraHeaders: Record<string, string> = {};
   if (apiKey) extraHeaders["X-AgentShield-API-Key"] = apiKey;
-  if (isWriteMethod && !skipCSRF) {
-    const csrf = getCSRFToken();
+  if (isWriteMethod && !skipCSRF && !isPreSessionAuthWrite) {
+    const csrf = await resolveCSRFToken();
     if (csrf) extraHeaders["X-CSRF-Token"] = csrf;
   }
 
@@ -80,15 +117,16 @@ export async function apiRequest<T = unknown>(
 
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
+      const bodyText = await res.text();
       try {
-        const payload = await res.json();
+        const payload = bodyText ? JSON.parse(bodyText) : null;
         msg =
           payload?.error?.message ||
           payload?.error?.code ||
           payload?.detail ||
           msg;
       } catch {
-        msg = (await res.text()) || msg;
+        msg = bodyText || msg;
       }
       throw new Error(msg);
     }

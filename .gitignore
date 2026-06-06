@@ -27,3 +27,5 @@ build/
 dist/
 scratch/
 test-results/
+.vercel
+.neon

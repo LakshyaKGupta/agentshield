@@ -580,6 +580,20 @@ class SecurityCoreTests(unittest.TestCase):
         )
         self.store.ledger.append(entry_live_blocked)
 
+        entry_live_tool_blocked = LedgerEntry(
+            id=6,
+            tenant_id=self.tenant.id,
+            agent_id=self.agent.agent_id,
+            event_type="tool_call",
+            severity=Severity.WARN,
+            verdict=Verdict.BLOCKED,
+            event_data={"source": "live_runtime", "tool": "database_delete"},
+            prev_hash="prev",
+            curr_hash="curr",
+            created_at=datetime.now(timezone.utc)
+        )
+        self.store.ledger.append(entry_live_tool_blocked)
+
         # Mock threat event from simulation (SHOULD BE IGNORED by source-gating)
         self.store.threat_events.append({
             "id": uuid4(),
@@ -611,13 +625,28 @@ class SecurityCoreTests(unittest.TestCase):
             evidence = get_agent_runtime_evidence(self.agent.agent_id, api_key)
             
             # Assert only live_runtime metrics are counted
-            self.assertEqual(evidence["protected_requests"], 2)  # entries 4 and 5
-            self.assertEqual(evidence["historical_protected_requests"], 2)
+            self.assertEqual(evidence["protected_requests"], 3)  # entries 4, 5, and 6
+            self.assertEqual(evidence["historical_protected_requests"], 3)
             self.assertEqual(evidence["allowed_requests"], 1)    # entry 4
-            self.assertEqual(evidence["blocked_threats"], 1)     # only entry 5 (live_runtime) is counted
+            self.assertEqual(evidence["blocked_threats"], 2)     # blocked message + blocked tool call
             self.assertTrue(evidence["runtime_active"])
             self.assertTrue(evidence["currently_active"])
             self.assertTrue(evidence["currently_connected"])
+
+            agents = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
+            agent_response = next(agent for agent in agents.agents if agent.agent_id == self.agent.agent_id)
+            self.assertEqual(agent_response.requests_screened, 3)
+            self.assertEqual(agent_response.threats_blocked, 2)
+            self.assertTrue(agent_response.live_connected)
+
+            revoke_agent(self.store, self.settings, self.tenant.id, self.agent.agent_id, self.private_key)
+            evidence_after_revoke = get_agent_runtime_evidence(self.agent.agent_id, api_key)
+            agents_after_revoke = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
+            revoked_response = next(agent for agent in agents_after_revoke.agents if agent.agent_id == self.agent.agent_id)
+            self.assertFalse(evidence_after_revoke["runtime_active"])
+            self.assertFalse(evidence_after_revoke["currently_connected"])
+            self.assertFalse(revoked_response.live_connected)
+            self.assertEqual(evidence_after_revoke["historical_protected_requests"], 3)
 
     def test_kill_switch_http_endpoint_enforcement(self) -> None:
         """Verify that a revoked agent's token returns HTTP 401 on /v1/shield/analyze."""
@@ -651,6 +680,15 @@ class SecurityCoreTests(unittest.TestCase):
             resp_revoked = client.post("/v1/shield/analyze", headers=headers, json=payload)
             self.assertEqual(resp_revoked.status_code, 401)
             self.assertEqual(resp_revoked.json()["error"]["code"], "AUTH_AGENT_TOKEN_REVOKED")
+
+    def test_health_and_ready_support_head_requests(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+
+        client = TestClient(app)
+
+        self.assertEqual(client.head("/health").status_code, 200)
+        self.assertEqual(client.head("/ready").status_code, 200)
 
 
 if __name__ == "__main__":

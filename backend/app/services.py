@@ -10,6 +10,7 @@ from .contracts import (
     AgentCreateRequest,
     AgentListResponse,
     AgentResponse,
+    AgentUpdateRequest,
     AnalyzeRequest,
     AttackSimulationRequest,
     AttackSimulationResult,
@@ -440,7 +441,43 @@ def spawn_agent(store: InMemoryStore, settings: Settings, request: AgentCreateRe
         last_live_at=agent.metadata.get("last_live_at"),
         runtime_source=_agent_source(agent),
         is_simulation=_is_simulation_agent(agent),
+        requests_screened=0,
+        threats_blocked=0,
+        policy_violations=0,
+        last_seen=None,
     )
+
+
+def update_agent_manifest(store: InMemoryStore, settings: Settings, request: AgentUpdateRequest, tenant_id, agent_id, private_key_pem: str) -> AgentResponse:
+    agent = store.agents[agent_id]
+    if agent.tenant_id != tenant_id:
+        raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
+
+    before_permissions = agent.permissions.model_dump()
+    if request.name is not None:
+        agent.name = request.name
+    if request.type is not None:
+        agent.type = request.type
+    if request.permissions is not None:
+        agent.permissions = request.permissions
+
+    store.persist_agent(agent)
+    append_ledger_entry(
+        store,
+        tenant_id=tenant_id,
+        agent_id=agent.id,
+        event_type="auth",
+        severity=Severity.INFO,
+        verdict=Verdict.ALLOWED,
+        event_data={
+            "action": "agent_policy_updated",
+            "agent_name": agent.name,
+            "source": "registered",
+            "previous_permissions": before_permissions,
+            "updated_permissions": agent.permissions.model_dump(),
+        },
+    )
+    return _agent_response(store, settings, agent, private_key_pem)
 
 
 def _agent_response(store: InMemoryStore, settings: Settings, agent: AgentRecord, private_key_pem: str) -> AgentResponse:
@@ -448,6 +485,74 @@ def _agent_response(store: InMemoryStore, settings: Settings, agent: AgentRecord
         token, expires_at, _ = issue_agent_token(store, settings, agent.tenant_id, agent.id, private_key_pem)
     else:
         token, expires_at = "", datetime.now(timezone.utc)
+        
+    requests_screened = 0
+    threats_blocked = 0
+    policy_violations = 0
+    last_seen = None
+    
+    if hasattr(store, "_connect") and store.backend_name == "postgres":
+        with store._connect() as conn:
+            # 1. Requests screened (messages / tool calls from live runtime)
+            res = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM audit_ledger WHERE agent_id = %s AND event_type IN ('message', 'tool_call') AND event_data->>'source' = 'live_runtime'",
+                (agent.id,)
+            )
+            row = res.fetchone()
+            requests_screened = row["cnt"] if row else 0
+            
+            # 2. Threats blocked. Use the ledger as the source of truth so
+            # dashboard counts match Evidence and /v1/metrics exactly.
+            res = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM audit_ledger WHERE agent_id = %s AND event_type IN ('message', 'tool_call') AND verdict = 'BLOCKED' AND event_data->>'source' = 'live_runtime'",
+                (agent.id,)
+            )
+            row = res.fetchone()
+            threats_blocked = row["cnt"] if row else 0
+            
+            # 3. Policy violations (blocked tool calls)
+            res = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM audit_ledger WHERE agent_id = %s AND event_type = 'tool_call' AND verdict = 'BLOCKED' AND event_data->>'source' = 'live_runtime'",
+                (agent.id,)
+            )
+            row = res.fetchone()
+            policy_violations = row["cnt"] if row else 0
+            
+            # 4. Last seen
+            res = conn.execute(
+                "SELECT MAX(created_at) AS last_seen FROM audit_ledger WHERE agent_id = %s AND event_data->>'source' = 'live_runtime'",
+                (agent.id,)
+            )
+            row = res.fetchone()
+            last_seen = row["last_seen"] if row and row["last_seen"] else None
+    else:
+        # Fallback memory store calculation
+        requests_screened = sum(
+            1 for e in store.ledger 
+            if e.agent_id == agent.id 
+            and e.event_type in ("message", "tool_call") 
+            and e.event_data.get("source") == "live_runtime"
+        )
+        threats_blocked = sum(
+            1 for e in store.ledger 
+            if e.agent_id == agent.id 
+            and e.event_type in ("message", "tool_call")
+            and e.verdict.value == "BLOCKED"
+            and e.event_data.get("source") == "live_runtime"
+        )
+        policy_violations = sum(
+            1 for e in store.ledger 
+            if e.agent_id == agent.id 
+            and e.event_type == "tool_call" 
+            and e.verdict.value == "BLOCKED" 
+            and e.event_data.get("source") == "live_runtime"
+        )
+        live_times = [e.created_at for e in store.ledger if e.agent_id == agent.id and e.event_data.get("source") == "live_runtime"]
+        last_seen = max(live_times) if live_times else agent.metadata.get("last_live_at")
+        
+    is_active = agent.status == "active"
+    live_connected = bool(agent.metadata.get("live_connected")) and is_active
+
     return AgentResponse(
         agent_id=agent.id,
         tenant_id=agent.tenant_id,
@@ -458,18 +563,42 @@ def _agent_response(store: InMemoryStore, settings: Settings, agent: AgentRecord
         token=token,
         token_expires_at=expires_at,
         permissions=agent.permissions,
-        live_connected=bool(agent.metadata.get("live_connected")),
+        live_connected=live_connected,
         first_live_at=agent.metadata.get("first_live_at"),
         last_live_at=agent.metadata.get("last_live_at"),
         runtime_source=_agent_source(agent),
         is_simulation=_is_simulation_agent(agent),
+        requests_screened=requests_screened,
+        threats_blocked=threats_blocked,
+        policy_violations=policy_violations,
+        last_seen=last_seen,
     )
 
 
 def list_agents(store: InMemoryStore, settings: Settings, tenant_id, private_key_pem: str) -> AgentListResponse:
-    return AgentListResponse(
-        agents=[_agent_response(store, settings, agent, private_key_pem) for agent in store.agents.values() if agent.tenant_id == tenant_id]
-    )
+    active_sdk_key_exists = False
+    if hasattr(store, "_connect") and store.backend_name == "postgres":
+        with store._connect() as conn:
+            res = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM api_keys WHERE tenant_id = %s AND status = 'active' AND scopes @> '[\"shield:write\"]'::jsonb",
+                (tenant_id,)
+            )
+            row = res.fetchone()
+            active_sdk_key_exists = (row["cnt"] > 0) if row else False
+    else:
+        active_sdk_key_exists = any(
+            k.tenant_id == tenant_id 
+            and k.status == "active" 
+            and "shield:write" in k.scopes 
+            for k in store.api_keys.values()
+        )
+        
+    agents = [
+        _agent_response(store, settings, agent, private_key_pem)
+        for agent in store.agents.values()
+        if agent.tenant_id == tenant_id
+    ]
+    return AgentListResponse(agents=agents, active_sdk_key_exists=active_sdk_key_exists)
 
 
 def revoke_agent(store: InMemoryStore, settings: Settings, tenant_id, agent_id, private_key_pem: str) -> AgentResponse:
@@ -477,6 +606,7 @@ def revoke_agent(store: InMemoryStore, settings: Settings, tenant_id, agent_id, 
     if agent.tenant_id != tenant_id:
         raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
     agent.status = "revoked"
+    agent.metadata["live_connected"] = False
     for token in store.tokens.values():
         if token.agent_id == agent_id:
             token.revoked_at = datetime.now(timezone.utc)

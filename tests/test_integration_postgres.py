@@ -22,12 +22,22 @@ from backend.app.store import CryptographicKey, PostgresStore, create_store
 class PostgresIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.db_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://agentshield:agentshield@127.0.0.1:5432/agentshield_test"
-        )
+        cls.db_url = os.getenv("AGENTSHIELD_TEST_DATABASE_URL")
         cls.redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         cls.settings = get_settings()
+
+        if not cls.db_url:
+            cls.store = None
+            cls.enabled = False
+            print("Skipping PostgresIntegrationTests: set AGENTSHIELD_TEST_DATABASE_URL to a disposable test database.")
+            return
+
+        app_db_url = os.getenv("DATABASE_URL")
+        if app_db_url and cls.db_url == app_db_url:
+            cls.store = None
+            cls.enabled = False
+            print("Skipping PostgresIntegrationTests: AGENTSHIELD_TEST_DATABASE_URL must not equal DATABASE_URL.")
+            return
         
         # Test if postgres connection works, otherwise skip tests
         try:

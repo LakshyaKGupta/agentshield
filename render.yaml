@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: agentshield-staging
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /ready
+    envVars:
+      - key: APP_VERSION
+        value: 0.1.0
+      - key: DEMO_MODE
+        value: false
+      - key: SIGNING_KEY_PROVIDER
+        value: local
+      - key: JWT_ISSUER
+        sync: false
+      - key: JWT_AUDIENCE
+        value: agentshield-agents
+      - key: API_KEY_PEPPER
+        sync: false
+      - key: KEY_ENCRYPTION_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: ALLOW_UNVERIFIED_FIREBASE_AUTH
+        value: false
+      - key: AGENTSHIELD_CHAT_LLM_ENABLED
+        value: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: TAVILY_API_KEY
+        sync: false

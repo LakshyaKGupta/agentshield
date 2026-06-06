@@ -159,7 +159,7 @@ export default function Hero({ setView, authenticated = false }: { setView: (v: 
               fontSize: 15, fontWeight: 600, fontFamily: "Inter, sans-serif",
               letterSpacing: "-.01em",
               boxShadow: "0 4px 14px rgba(17,17,17,.2)",
-              cursor: "none", transition: "all 200ms ease",
+              cursor: "pointer", transition: "all 200ms ease",
             }}>
             {authenticated ? "Go to Console →" : "Create workspace →"}
           </button>
@@ -174,7 +174,7 @@ export default function Hero({ setView, authenticated = false }: { setView: (v: 
               background: "#fff", color: "#111", fontSize: 15, fontWeight: 600,
               fontFamily: "Inter, sans-serif", letterSpacing: "-.01em",
               border: "1.5px solid #E8E6E0",
-              cursor: "none", transition: "all 200ms ease",
+              cursor: "pointer", transition: "all 200ms ease",
             }}>
             See how it works
           </button>

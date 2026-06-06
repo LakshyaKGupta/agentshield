@@ -287,6 +287,48 @@ def get_api_key_hash_from_session(request: Request) -> str | None:
     return _resolve_session_hash(session)
 
 
+def get_csrf_token_from_session(request: Request) -> str | None:
+    session_id = request.cookies.get(_SESSION_COOKIE)
+    if not session_id:
+        return None
+
+    if _redis_client is not None:
+        try:
+            import json
+            raw = _redis_client.get(f"session:{session_id}")
+            if raw:
+                data = json.loads(raw)
+                token = data.get("csrf_token")
+                if token:
+                    return token
+        except Exception:
+            pass
+
+    if _database_url:
+        try:
+            if _pool is not None:
+                ctx = _pool.connection()
+            else:
+                import psycopg
+                ctx = psycopg.connect(_database_url)
+            with ctx as conn:
+                row = conn.execute(
+                    "SELECT csrf_token FROM browser_sessions WHERE session_id = %s AND expires_at > now()",
+                    (session_id,),
+                ).fetchone()
+                if row:
+                    return row[0]
+        except Exception:
+            pass
+
+    local = _SESSION_STORE.get(session_id)
+    if local:
+        # Local legacy sessions do not retain the csrf token. The cookie path
+        # still works in development; durable Postgres sessions use the query above.
+        return request.cookies.get(_CSRF_COOKIE)
+    return None
+
+
 def _invalidate(session_id: str) -> None:
     _SESSION_STORE.pop(session_id, None)
     if _redis_client is not None:
