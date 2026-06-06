@@ -4,6 +4,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+import ssl
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Generator, Optional
@@ -162,7 +163,14 @@ class AgentShield:
             headers["Authorization"] = f"Bearer {token}"
         request = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            context = None
+            if self.base_url.startswith("https://"):
+                try:
+                    import certifi  # type: ignore
+                    context = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    context = ssl.create_default_context()
+            with urllib.request.urlopen(request, timeout=self.timeout, context=context) as response:
                 return json.loads(response.read().decode())
         except urllib.error.HTTPError as exc:
             payload = exc.read().decode()

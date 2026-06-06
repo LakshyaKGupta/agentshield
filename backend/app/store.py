@@ -516,7 +516,13 @@ class PostgresStore(InMemoryStore):
                 """
                 INSERT INTO agents (id, tenant_id, name, type, permissions, trust_score, status, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions, trust_score = EXCLUDED.trust_score, status = EXCLUDED.status, metadata = EXCLUDED.metadata
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    type = EXCLUDED.type,
+                    permissions = EXCLUDED.permissions,
+                    trust_score = EXCLUDED.trust_score,
+                    status = EXCLUDED.status,
+                    metadata = EXCLUDED.metadata
                 """,
                 (agent.id, agent.tenant_id, agent.name, agent.type, Json(agent.permissions.model_dump()), agent.trust_score, agent.status, Json(meta)),
             )

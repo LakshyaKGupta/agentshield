@@ -53,6 +53,12 @@ class AgentCreateRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AgentUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    type: Literal["user_agent", "research_agent", "executor_agent", "security_agent", "custom"] | None = None
+    permissions: PermissionManifest | None = None
+
+
 class AgentResponse(BaseModel):
     agent_id: UUID
     tenant_id: UUID
@@ -68,10 +74,15 @@ class AgentResponse(BaseModel):
     last_live_at: datetime | None = None
     runtime_source: str = "registered"
     is_simulation: bool = False
+    requests_screened: int = 0
+    threats_blocked: int = 0
+    policy_violations: int = 0
+    last_seen: datetime | None = None
 
 
 class AgentListResponse(BaseModel):
     agents: list[AgentResponse]
+    active_sdk_key_exists: bool = False
 
 
 class WorkspaceSignupRequest(BaseModel):
