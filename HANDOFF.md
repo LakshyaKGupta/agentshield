@@ -1,5 +1,54 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-06-06 (React Router Migration)
+
+### Objective
+- Convert state-based navigation (`view` state) to URL-based routing using `react-router-dom`.
+- URLs now reflect the active screen. Sidebar links update the address bar. Refresh and back button work correctly.
+- No backend changes. No breaking changes to page component signatures.
+
+### Completed
+- Installed `react-router-dom` (`npm install react-router-dom`).
+- Added `VIEW_ROUTES` mapping (view key → URL path) and `ROUTE_VIEWS` reverse mapping.
+- Converted `Sidebar` to use `useNavigate` + `useLocation` (active item derived from `location.pathname`).
+- Updated `ProductShell` to use the new `Sidebar` (no more `active` / `setView` props).
+- All direct `<Sidebar active="..." setView={...}>` calls (10 locations) updated to `<Sidebar onLogout={...}/>`.
+- Renamed `App` → `AppRouter`. Uses `useNavigate`/`useLocation` internally as a `setView` shim.
+- `AppRouter` is wrapped in `BrowserRouter` at the render root.
+- All protected routes redirect unauthenticated users to `/signin` preserving the `from` location.
+- Auth routes redirect authenticated users to `/dashboard`.
+- `<Navigate>` fallback catches unknown paths.
+- Firebase error is only shown when user explicitly clicks "Sign in with Google" (not a passive banner — no change needed).
+- Backend already had a SPA catch-all (`/{full_path:path}` → `index.html`) — no backend changes required.
+
+### Route Map
+| Old view key   | URL path        |
+|----------------|-----------------|
+| `home`         | `/`             |
+| `login`        | `/signin`       |
+| `signup`       | `/signup`       |
+| `app`          | `/dashboard`    |
+| `quickstart`   | `/quickstart`   |
+| `runtime`      | `/live`         |
+| `ledger`       | `/evidence`     |
+| `agents`       | `/protect`      |
+| `enterprise`   | `/enterprise`   |
+| `attack`       | `/attack`       |
+| `playground`   | `/playground`   |
+| `settings`     | `/settings`     |
+| `how-it-works` | `/how-it-works` |
+
+### Verification
+- `npm run build` → ✅ zero errors, 2005 modules transformed, 1.72s build time.
+- Backend SPA catch-all confirmed at `main.py:2587` — already handles all frontend routes.
+
+### Next Steps (if any)
+- Manual QA: browser refresh on `/dashboard`, `/live`, `/evidence` while logged in.
+- Manual QA: navigate to `/dashboard` while logged out → should redirect to `/signin`.
+- Manual QA: log in from `/signin?from=/settings` → should redirect back to `/settings`.
+
+---
+
 ## Session Update - 2026-06-04 (UI Focus Pass)
 
 ### Objective
