@@ -6720,6 +6720,7 @@ class ErrorBoundary extends React.Component<{children:React.ReactNode},{hasError
  */
 function AppRouter() {
   const [apiKey, setApiKey] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
   const shield = useData(apiKey);
 
   // Restore session from httpOnly cookie on mount
@@ -6728,11 +6729,22 @@ function AppRouter() {
     const hasSessionMarker = /(?:^|;\s*)csrf_token=/.test(document.cookie);
     if (!hasSessionMarker) {
       setApiKey("");
+      setAuthLoading(false);
       return () => { cancelled = true; };
     }
     requestJson("/v1/auth/me", SESSION_AUTH)
-      .then(() => { if (!cancelled) setApiKey(SESSION_AUTH); })
-      .catch(() => { if (!cancelled) setApiKey(""); });
+      .then(() => {
+        if (!cancelled) {
+          setApiKey(SESSION_AUTH);
+          setAuthLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApiKey("");
+          setAuthLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -6811,6 +6823,17 @@ function AppRouter() {
   };
 
   const authenticated = !!apiKey;
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg)", color: "var(--ink)", fontFamily: "Inter, sans-serif" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 40, height: 40, border: "3px solid var(--line)", borderTopColor: "var(--brand)", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ink-faded)" }}>Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
