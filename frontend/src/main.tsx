@@ -1328,7 +1328,7 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
   };
 
   const doGoogle = async () => {
-    if (!isFirebaseConfigured || !auth || !googleProvider) { setError("Firebase not configured."); return; }
+    if (!isFirebaseConfigured || !auth || !googleProvider) { setError("Google sign-in is currently unavailable."); return; }
     setLoading(true); setError(null);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
