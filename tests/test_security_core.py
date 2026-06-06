@@ -690,6 +690,20 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertEqual(client.head("/health").status_code, 200)
         self.assertEqual(client.head("/ready").status_code, 200)
 
+    def test_envelope_encryptor_requires_real_key_material(self) -> None:
+        from unittest.mock import patch
+        from backend.app.security.encryption import EnvelopeEncryptor
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(RuntimeError):
+                EnvelopeEncryptor(str(self.tenant.id)).encrypt("secret")
+
+        with patch.dict("os.environ", {"KEY_ENCRYPTION_KEY": "a" * 64}, clear=True):
+            encryptor = EnvelopeEncryptor(str(self.tenant.id))
+            ciphertext = encryptor.encrypt("secret")
+            self.assertNotEqual(ciphertext, "secret")
+            self.assertEqual(encryptor.decrypt(ciphertext), "secret")
+
 
 if __name__ == "__main__":
     unittest.main()

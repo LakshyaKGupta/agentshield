@@ -3695,3 +3695,54 @@ Continue the hosted startup/enterprise audit, fix every real issue found, verify
   - Persistent WebSockets and background outbox processing need a proper worker/realtime host.
   - Redis is not configured on production, so rate limiting uses fallback behavior.
   - Postgres integration tests need a disposable `AGENTSHIELD_TEST_DATABASE_URL` in CI to stop being skipped.
+
+## 2026-06-06 - Secret Cleanup + Production Agent Creation Regression
+
+### User Request
+Prioritize the security cleanup and verify the metric fix with a concrete production run before doing more UI or enterprise feature work.
+
+### Findings
+- Current `HEAD` initially still contained an old literal Groq API key in `HANDOFF.md`.
+- Working tree and current `HEAD` now scan clean for common provider-key patterns after sanitization.
+- Git history still contains the old Groq key in earlier commits, so the key must be rotated and history-cleaned before enterprise readiness claims.
+- Production agent creation was returning `500 Internal Server Error` on Vercel after signup.
+  - Root cause: `issue_agent_token()` constructed the file-backed `LocalKeyProvider` before entering its fallback `try`.
+  - On Vercel, the default path `/var/task/backend/.keys` is read-only, so key-provider construction failed before DB-backed tenant key fallback could sign the token.
+
+### Changes Made
+- Sanitized tracked `HANDOFF.md` so current GitHub `main` no longer exposes the literal Groq key.
+- Fixed Vercel/serverless token issuance:
+  - `backend/app/security/jwt_identity.py` now constructs and uses the key provider inside the fallback-protected block.
+  - `backend/app/security/key_provider.py` defaults local provider files to `/tmp/agentshield-keys` on Vercel when `KEYS_DIR` is not explicitly configured.
+- Removed hardcoded envelope encryption KEK:
+  - `backend/app/security/encryption.py` now requires `KEY_ENCRYPTION_KEY` and accepts 32-byte hex or URL-safe base64 material.
+  - Added regression coverage that missing key material fails closed and valid key material round-trips encryption.
+
+### Verification
+- Secret scans:
+  - `git grep` against current `HEAD` found no literal Groq/Tavily/OpenAI/GitHub-style provider keys.
+  - `rg` against the working tree found no literal Groq/Tavily/OpenAI/GitHub-style provider keys.
+  - `git log -G` still finds the old Groq key in earlier commits; rotate the key and perform history cleanup if required.
+- GitHub repo state:
+  - Repo confirmed private via GitHub CLI.
+  - GitHub security-and-analysis API returned 404 from this token/path, so GitHub Secret Scanning status was not verified through CLI.
+- Local verification:
+  - `python3 -m unittest tests.test_security_core -v` passed: 30 tests.
+  - `python3 -m compileall backend/app sdk/python/agentshield` passed.
+  - `cd frontend && npm run build` passed before deployment.
+- Hosted production verification:
+  - `POST /api/v1/agents` now returns 200 after fresh signup.
+  - `GET /api/v1/agents` now returns 200 for that workspace.
+  - 10-request metric audit passed on `https://agentshield-sigma.vercel.app`:
+    - Expected: 10 protected requests, 7 allowed, 3 blocked.
+    - `/api/v1/metrics`: `live_runtime_entries=10`, `decisions_allowed=7`, `decisions_blocked=3`.
+    - `/api/v1/agents`: `requests_screened=10`, `threats_blocked=3`, `live_connected=true`.
+    - `/runtime-evidence`: `protected_requests=10`, `allowed_requests=7`, `blocked_threats=3`.
+    - `/ledger`: 10 live runtime message entries, 7 allowed, 3 blocked.
+    - Dashboard, Live Protection, Evidence, and Enterprise all showed matching workspace evidence; Enterprise shows the values in the Agent Coverage and Investigation tables.
+  - `/api/ready` remained healthy: Postgres connected and ledger valid.
+
+### Remaining Security Actions
+- Rotate the exposed Groq key immediately.
+- Decide whether to rewrite Git history. This requires a destructive history rewrite and force-push; do it only after coordination.
+- Enable/verify GitHub Secret Scanning in the repository UI or with a token that can access the security-and-analysis endpoint.
