@@ -1,3 +1,4 @@
+# CLI smoke testing utility runner
 #!/bin/bash
 set -e
 
