@@ -30,32 +30,31 @@ def append_ledger_entry(
     verdict: Verdict,
     event_data: dict,
 ) -> LedgerEntry:
-    prev_hash = store.ledger[-1].curr_hash if store.ledger else GENESIS_HASH
-    created_at = datetime.now(timezone.utc)
-    payload = {
-        "tenant_id": str(tenant_id),
-        "agent_id": str(agent_id) if agent_id else None,
-        "event_type": event_type,
-        "severity": severity.value,
-        "verdict": verdict.value,
-        "event_data": event_data,
-        "created_at": canonical_timestamp(created_at),
-    }
-    curr_hash = canonical_hash(payload, prev_hash)
-    entry = LedgerEntry(
-        id=len(store.ledger) + 1,
-        tenant_id=tenant_id,
-        agent_id=agent_id,
-        event_type=event_type,  # type: ignore[arg-type]
-        severity=severity,
-        verdict=verdict,
-        event_data=event_data,
-        prev_hash=prev_hash,
-        curr_hash=curr_hash,
-        created_at=created_at,
-    )
-    store.ledger.append(entry)
-    store.persist_ledger_entry(entry)
+    def build_entry(next_id: int, prev_hash: str, created_at: datetime) -> LedgerEntry:
+        payload = {
+            "tenant_id": str(tenant_id),
+            "agent_id": str(agent_id) if agent_id else None,
+            "event_type": event_type,
+            "severity": severity.value,
+            "verdict": verdict.value,
+            "event_data": event_data,
+            "created_at": canonical_timestamp(created_at),
+        }
+        curr_hash = canonical_hash(payload, prev_hash)
+        return LedgerEntry(
+            id=next_id,
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            event_type=event_type,  # type: ignore[arg-type]
+            severity=severity,
+            verdict=verdict,
+            event_data=event_data,
+            prev_hash=prev_hash,
+            curr_hash=curr_hash,
+            created_at=created_at,
+        )
+
+    entry = store.append_ledger_entry_atomic(build_entry)
     event = {"event": "security.event.created", "ledger_id": entry.id, "agent_id": str(agent_id), "verdict": verdict.value}
     store.events.append(event)
     store.persist_event(event)

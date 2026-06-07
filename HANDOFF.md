@@ -4077,3 +4077,36 @@ Prioritize the security cleanup and verify the metric fix with a concrete produc
 - Rotate the exposed Groq key immediately.
 - Decide whether to rewrite Git history. This requires a destructive history rewrite and force-push; do it only after coordination.
 - Enable/verify GitHub Secret Scanning in the repository UI or with a token that can access the security-and-analysis endpoint.
+
+## 2026-06-07 - Final Production Trust Fix Pass
+
+### User Request
+Perform a final startup-and-enterprise audit/fix pass, verify that the hosted product works with real runtime traffic rather than local-only state, fix visible onboarding/API issues, and update GitHub and the website.
+
+### Changes Made
+- Fixed audit-ledger concurrency correctness.
+  - `append_ledger_entry()` now delegates ID/hash allocation to a store-level atomic append path.
+  - In-memory store uses a ledger lock for concurrent appends.
+  - Postgres store now uses a database advisory transaction lock, reads the current latest block under that lock, inserts the next block, and no longer silently drops ledger writes with `ON CONFLICT DO NOTHING`.
+  - Added regression coverage that concurrent ledger appends produce unique sequential IDs and a valid hash chain.
+- Fixed developer onboarding copy-paste accuracy.
+  - Legacy curl snippets now include required `direction` for `/v1/shield/analyze`.
+  - Tool-call snippets now use the real backend field `tool_name` instead of `tool`.
+  - Curl snippets include `Content-Type: application/json`.
+- Improved activation and enterprise navigation.
+  - `Settings` now exposes `SDK Keys` and `Team` as first-level tabs instead of hiding them behind Advanced.
+  - SDK key creation input layout now keeps the key-name field fully visible with a wider, responsive grid.
+
+### Verification
+- Local tests:
+  - `python3 -m unittest tests.test_security_core.SecurityCoreTests.test_concurrent_ledger_appends_keep_unique_chain tests.test_security_core.SecurityCoreTests.test_blocks_prompt_injection_and_writes_ledger -v` passed.
+  - `python3 -m unittest discover -s tests -v` passed: 47 tests, 3 skipped because `AGENTSHIELD_TEST_DATABASE_URL` is not configured.
+  - `python3 -m compileall backend/app sdk/python/agentshield` passed.
+  - `cd frontend && npm run build` passed.
+  - `git diff --check` passed.
+
+### Remaining Verification Needed After Deploy
+- Hosted fresh-account setup progress should start at `20% complete`, not `40%`, until a real SDK key is created.
+- Hosted concurrent SDK/API traffic should no longer duplicate ledger IDs or lose successful decisions.
+- Hosted cross-tenant test must verify SDK key from Workspace A cannot operate Agent B.
+- Hosted startup flow must pass: signup -> register agent -> generate SDK key -> built-in verification -> external SDK/API traffic -> evidence -> kill switch.

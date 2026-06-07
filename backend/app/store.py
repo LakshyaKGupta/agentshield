@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import RLock
+from typing import Callable
 from uuid import UUID, uuid4
 
 from .contracts import LedgerEntry, PermissionManifest, Severity, Verdict
@@ -121,6 +123,7 @@ class InMemoryStore:
         self.agents: dict[UUID, AgentRecord] = {}
         self.tokens: dict[str, TokenRecord] = {}
         self.ledger: list[LedgerEntry] = []
+        self._ledger_lock = RLock()
         self.threat_events: list[dict] = []
         self.trust_history: list[dict] = []
         self.events: list[dict] = []
@@ -153,6 +156,17 @@ class InMemoryStore:
 
     def persist_ledger_entry(self, entry: LedgerEntry) -> None:
         return
+
+    def append_ledger_entry_atomic(
+        self,
+        entry_factory: Callable[[int, str, datetime], LedgerEntry],
+    ) -> LedgerEntry:
+        with self._ledger_lock:
+            prev_hash = self.ledger[-1].curr_hash if self.ledger else "0" * 64
+            entry = entry_factory(len(self.ledger) + 1, prev_hash, datetime.now(timezone.utc))
+            self.ledger.append(entry)
+            self.persist_ledger_entry(entry)
+            return entry
 
     def persist_threat_event(self, threat: dict) -> None:
         return
@@ -541,13 +555,45 @@ class PostgresStore(InMemoryStore):
             )
             conn.commit()
 
+    def append_ledger_entry_atomic(
+        self,
+        entry_factory: Callable[[int, str, datetime], LedgerEntry],
+    ) -> LedgerEntry:
+        with self._connect() as conn:
+            conn.execute("SELECT pg_advisory_xact_lock(724216789)")
+            latest = conn.execute(
+                "SELECT id, curr_hash FROM audit_ledger ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            next_id = int(latest["id"]) + 1 if latest else 1
+            prev_hash = latest["curr_hash"] if latest else "0" * 64
+            entry = entry_factory(next_id, prev_hash, datetime.now(timezone.utc))
+            conn.execute(
+                """
+                INSERT INTO audit_ledger (id, tenant_id, agent_id, event_type, severity, verdict, event_data, prev_hash, curr_hash, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    entry.id,
+                    entry.tenant_id,
+                    entry.agent_id,
+                    entry.event_type,
+                    entry.severity.value,
+                    entry.verdict.value,
+                    Json(entry.event_data),
+                    entry.prev_hash,
+                    entry.curr_hash,
+                    entry.created_at,
+                ),
+            )
+            conn.commit()
+            return entry
+
     def persist_ledger_entry(self, entry: LedgerEntry) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO audit_ledger (id, tenant_id, agent_id, event_type, severity, verdict, event_data, prev_hash, curr_hash, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
                 """,
                 (entry.id, entry.tenant_id, entry.agent_id, entry.event_type, entry.severity.value, entry.verdict.value, Json(entry.event_data), entry.prev_hash, entry.curr_hash, entry.created_at),
             )

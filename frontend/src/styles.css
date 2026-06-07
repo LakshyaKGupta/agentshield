@@ -3396,7 +3396,7 @@ ul, ol { list-style: none; }
 }
 .api-key-create {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
   padding: 14px;
@@ -3404,6 +3404,7 @@ ul, ol { list-style: none; }
   border-radius: var(--r-md);
   background: var(--bg-alt);
   max-width: 820px;
+  width: 100%;
 }
 .api-key-create label {
   display: flex;
@@ -3421,6 +3422,7 @@ ul, ol { list-style: none; }
 .api-key-create .settings-input {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
 }
 .integration-next-panel,
 .verify-next-actions article,

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from backend.app.contracts import AgentCreateRequest, AnalyzeRequest, PermissionManifest, ToolCallRequest, Verdict
-from backend.app.ledger.service import verify_ledger
+from backend.app.contracts import AgentCreateRequest, AnalyzeRequest, PermissionManifest, Severity, ToolCallRequest, Verdict
+from backend.app.ledger.service import append_ledger_entry, verify_ledger
 from backend.app.security.api_keys import authenticate_api_key, create_api_key, list_sdk_api_keys, revoke_api_key
 from backend.app.security.jwt_identity import generate_dev_keypair
 from backend.app.services import analyze_message, build_agent_security_summary, check_tool_call, list_agents, revoke_agent, run_attack_simulation, spawn_agent
@@ -71,6 +72,29 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertFalse(verdict.allowed)
         self.assertEqual(verdict.verdict, Verdict.BLOCKED)
         self.assertGreaterEqual(verdict.ledger_id, 1)
+        self.assertTrue(verify_ledger(self.store).valid)
+
+    def test_concurrent_ledger_appends_keep_unique_chain(self) -> None:
+        first_new_id = len(self.store.ledger) + 1
+
+        def write_entry(i: int) -> int:
+            entry = append_ledger_entry(
+                self.store,
+                tenant_id=self.tenant.id,
+                agent_id=self.agent.agent_id,
+                event_type="message",
+                severity=Severity.INFO,
+                verdict=Verdict.ALLOWED,
+                event_data={"source": "live_runtime", "index": i},
+            )
+            return entry.id
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            ids = list(executor.map(write_entry, range(24)))
+
+        self.assertEqual(len(ids), 24)
+        self.assertEqual(len(set(ids)), 24)
+        self.assertEqual(sorted(ids), list(range(first_new_id, first_new_id + 24)))
         self.assertTrue(verify_ledger(self.store).valid)
 
     def test_allows_benign_message(self) -> None:
