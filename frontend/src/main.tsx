@@ -49,6 +49,7 @@ type LedgerEntry = { id: number; agent_id: string | null; event_type: string; ve
 type Threat = { id: string; ledger_id: number; agent_id: string; attack_type: string; confidence: number; evidence: string; resolved: boolean; created_at: string };
 type AppData = { apiKey: string; agents: Agent[]; ledger: LedgerEntry[]; threats: Threat[]; ledgerValid: boolean|null; settings: any | null; loading: boolean; error: string|null; apiKeys: any[]; activeSdkKeyExists?: boolean };
 type AuthResponse = { tenant_id: string; workspace_name: string; email: string; api_key: string };
+type SessionStatus = { authenticated: boolean; csrf_ready?: boolean };
 type ReadyStatus = { ready: boolean; store?: string; database?: string; ledger_valid?: boolean };
 type EnterpriseMetrics = {
   agents_total: number;
@@ -1320,7 +1321,6 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
       );
       const r = await backendAuth();
       onAuth(r.api_key);
-      setView("app");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Authentication failed.";
       setError(msg.includes("auth/") ? translateFirebaseError(msg) : msg);
@@ -1334,7 +1334,7 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
       const cred = await signInWithPopup(auth, googleProvider);
       const idToken = await cred.user.getIdToken();
       const r = await requestJson<AuthResponse>("/v1/auth/firebase-verify", undefined, { method:"POST", body: JSON.stringify({ firebase_id_token: idToken, workspace_name: cred.user.displayName || "My Workspace" }) });
-      onAuth(r.api_key); setView("app");
+      onAuth(r.api_key);
     } catch (err) { setError(err instanceof Error ? translateFirebaseError(err.message) : "Google sign-in failed."); }
     finally { setLoading(false); }
   };
@@ -1351,12 +1351,12 @@ function AuthPage({ mode, setView, onAuth }: { mode: "login"|"signup"; setView: 
     try {
       try {
         const r = await requestJson<AuthResponse>("/v1/auth/signup", undefined, { method:"POST", body: JSON.stringify({ email: E, password: P, workspace_name: W }) });
-        onAuth(r.api_key); setView("app");
+        onAuth(r.api_key);
       } catch (se) {
         const msg = se instanceof Error ? se.message : "";
         if (msg.includes("AUTH_EMAIL_EXISTS") || msg.includes("409") || msg.includes("already")) {
           const r = await requestJson<AuthResponse>("/v1/auth/login", undefined, { method:"POST", body: JSON.stringify({ email: E, password: P }) });
-          onAuth(r.api_key); setView("app");
+          onAuth(r.api_key);
         } else throw se;
       }
     } catch (err) {
@@ -1480,11 +1480,11 @@ const SidebarIcons: Record<string, JSX.Element> = {
 const VIEW_ROUTES: Record<string, string> = {
   home: "/",
   app: "/dashboard",
-  quickstart: "/quickstart",
+  quickstart: "/protect",
   runtime: "/live",
   ledger: "/evidence",
   attack: "/attack",
-  agents: "/protect",
+  agents: "/agents",
   playground: "/playground",
   enterprise: "/enterprise",
   settings: "/settings",
@@ -2138,10 +2138,10 @@ verdict = shield.analyze_message(
           <div className="panel" style={{ maxWidth: 480, width: "100%", padding: 32, textAlign: "center" }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>🔴 No Agents Registered</h2>
             <p style={{ color: "var(--ink-60)", fontSize: 14, marginBottom: 24 }}>
-              Register your first AI agent identity in the registry to activate runtime security controls.
+              Register your first AI agent identity in the Protect Agent flow to activate runtime security controls.
             </p>
-            <button className="btn btn-primary" onClick={() => setView("agents")}>
-              Go to Agent Registry <ArrowRight size={16} style={{ marginLeft: 8 }} />
+            <button className="btn btn-primary" onClick={() => setView("quickstart")}>
+              Protect Agent <ArrowRight size={16} style={{ marginLeft: 8 }} />
             </button>
           </div>
         </div>
@@ -2509,7 +2509,7 @@ function LedgerPage({ setView, data, verifyLedger, onLogout }: { setView:(v:stri
                 AgentShield records setup actions, simulator runs, and live SDK/API decisions in one append-only audit ledger. Live external-agent traffic appears only after your runtime sends a protected call with an SDK key.
               </p>
               <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-                <button className="btn-primary btn-sm" onClick={() => setView("agents")}>Register Agent</button>
+                <button className="btn-primary btn-sm" onClick={() => setView("quickstart")}>Protect Agent</button>
                 <button className="btn-primary btn-sm" style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--ink)" }} onClick={() => setView("attack")}>Open Attack Lab</button>
               </div>
             </div>
@@ -6726,16 +6726,10 @@ function AppRouter() {
   // Restore session from httpOnly cookie on mount
   useEffect(() => {
     let cancelled = false;
-    const hasSessionMarker = /(?:^|;\s*)csrf_token=/.test(document.cookie);
-    if (!hasSessionMarker) {
-      setApiKey("");
-      setAuthLoading(false);
-      return () => { cancelled = true; };
-    }
-    requestJson("/v1/auth/me", SESSION_AUTH)
-      .then(() => {
+    requestJson<SessionStatus>("/v1/auth/session-status", SESSION_AUTH)
+      .then((status) => {
         if (!cancelled) {
-          setApiKey(SESSION_AUTH);
+          setApiKey(status.authenticated ? SESSION_AUTH : "");
           setAuthLoading(false);
         }
       })
@@ -6871,8 +6865,9 @@ function AppRouter() {
         <Route path="/dashboard"  element={authenticated ? <Dashboard    setView={_setView} data={shield.data} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
         <Route path="/live"       element={authenticated ? <LiveProtectionPage setView={_setView} data={shield.data} reload={shield.reload} revokeAgent={shield.revokeAgent} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
         <Route path="/evidence"   element={authenticated ? <LedgerPage   setView={_setView} data={shield.data} verifyLedger={shield.verifyLedger} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
-        <Route path="/protect"    element={authenticated ? <AgentsPage   setView={_setView} data={shield.data} revokeAgent={shield.revokeAgent} spawnAgent={shield.spawnAgent} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
-        <Route path="/quickstart" element={authenticated ? <QuickStartPage setView={_setView} data={shield.data} spawnAgent={shield.spawnAgent} reload={shield.reload} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
+        <Route path="/protect"    element={authenticated ? <QuickStartPage setView={_setView} data={shield.data} spawnAgent={shield.spawnAgent} reload={shield.reload} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
+        <Route path="/quickstart" element={<Navigate to="/protect" replace/>} />
+        <Route path="/agents"     element={authenticated ? <AgentsPage   setView={_setView} data={shield.data} revokeAgent={shield.revokeAgent} spawnAgent={shield.spawnAgent} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
         <Route path="/enterprise" element={authenticated ? <EnterprisePage setView={_setView} data={shield.data} apiKey={apiKey} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
         <Route path="/attack"     element={authenticated ? <AttackPage   setView={_setView} runAttack={shield.runAttack} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />
         <Route path="/playground" element={authenticated ? <PlaygroundPage setView={_setView} data={shield.data} reload={shield.reload} onLogout={_logout}/> : <Navigate to="/signin" state={{ from: location }} replace/>} />

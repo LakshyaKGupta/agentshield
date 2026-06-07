@@ -1,5 +1,75 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-06-07 (Production Route Visibility Fix)
+
+### Objective
+- Investigate the live-site "website is not showing" report without accepting the incorrect claim that React Router `<Link>` must be inside `<Routes>`.
+- Fix the real issues found: `/protect` was showing the legacy Agent Registry instead of the primary Protect Agent flow, and successful auth could overwrite deep-link login redirects back to `/dashboard`.
+
+### Completed
+- Verified live production before changes:
+  - `/`, `/signin`, `/signup`, `/dashboard`, `/protect`, `/live`, `/evidence`, `/enterprise`, and `/settings` returned the SPA shell with HTTP 200.
+  - Authenticated production browser smoke rendered all primary routes without page errors.
+  - Found semantic route mismatch: `/protect` rendered `AgentsPage` / "Agent Registry" while the visible sidebar "Protect Agent" path used `/quickstart`.
+- Updated frontend route ownership:
+  - `/protect` now renders `QuickStartPage` / Protect Agent.
+  - `/quickstart` redirects to `/protect`.
+  - Legacy Agent Registry remains available internally at `/agents`.
+  - Primary empty-state CTAs now point to Protect Agent instead of the legacy registry.
+- Fixed post-login deep-link preservation:
+  - Removed `setView("app")` calls from `AuthPage` after successful email, Google, and dev-login flows.
+  - `AppRouter` now remains the single source of truth for post-login navigation and can preserve the originally requested route.
+- Added quiet session detection:
+  - New `GET /v1/auth/session-status` returns `{ authenticated, csrf_ready }` with HTTP 200 even when signed out.
+  - Frontend session restoration uses this endpoint instead of creating noisy unauthenticated `/auth/me` 401s on public pages.
+- Added regression coverage for signed-out session status.
+
+### Verification
+- `cd frontend && npm run build` -> passed.
+- `python3 -m unittest discover -s tests -v` -> passed: 42 tests, 3 skipped because no disposable Postgres integration database is configured.
+- `git diff --check` -> passed.
+- Local production preview direct-route smoke:
+  - `/`, `/signin`, `/signup`, `/dashboard`, `/protect`, `/quickstart`, `/live`, `/evidence`, `/enterprise`, `/settings` all rendered without page exceptions.
+
+### Notes
+- The React Router architecture is valid: `BrowserRouter` wraps the app and Vercel rewrites already serve `/index.html` for direct frontend paths.
+- The legacy registry code is intentionally kept for now at `/agents`; it is no longer part of the primary navigation.
+
+---
+
+## Session Update - 2026-06-06 (Google Sign-In Configuration)
+
+### Objective
+- Enable Google Sign-In on the live site (`https://agentshield-sigma.vercel.app/`) and locally by fetching Firebase credentials programmatically from the logged-in Firebase CLI session and configuring them on Vercel and locally.
+
+### Completed
+- Programmatically fetched Firebase SDK configuration (`agenteval1` project and `AgentShield` Web App).
+- Configured local environment variables in `frontend/.env.local`.
+- Created a robust Python script `scratch/add_vercel_envs.py` that safely writes environment variables to all Vercel environments (`production`, `preview`, `development`) without prompt blocking.
+- Configured Vercel with all 8 variables:
+  - `VITE_FIREBASE_API_KEY`
+  - `VITE_FIREBASE_AUTH_DOMAIN`
+  - `VITE_FIREBASE_PROJECT_ID`
+  - `VITE_FIREBASE_STORAGE_BUCKET`
+  - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+  - `VITE_FIREBASE_APP_ID`
+  - `FIREBASE_PROJECT_ID`
+  - `ALLOW_UNVERIFIED_FIREBASE_AUTH`
+- Triggered Vercel production redeployment and confirmed it successfully completed and aliased to `https://agentshield-sigma.vercel.app`.
+- Created Playwright E2E verification test `frontend/tests/e2e/verify_google.spec.ts` for production and `frontend/tests/e2e/verify_google_local.spec.ts` for localhost.
+- Ran tests and confirmed:
+  - Local Google Sign-In is fully active and successfully triggers Firebase authentication without any errors (passes test).
+  - Production Google Sign-In is active but throws `auth/unauthorized-domain` because `agentshield-sigma.vercel.app` needs to be added to the Firebase authorized domains list.
+
+### Next Steps / Action Required
+- **Action Required for User:** Add `agentshield-sigma.vercel.app` to your Firebase project's authorized domains list:
+  1. Open the [Firebase Console](https://console.firebase.google.com/).
+  2. Select your project **agenteval1**.
+  3. Go to **Authentication** > **Settings** > **Authorized domains**.
+  4. Click **Add domain** and enter `agentshield-sigma.vercel.app`.
+
+---
+
 ## Session Update - 2026-06-06 (React Router Migration)
 
 ### Objective
@@ -29,10 +99,10 @@
 | `login`        | `/signin`       |
 | `signup`       | `/signup`       |
 | `app`          | `/dashboard`    |
-| `quickstart`   | `/quickstart`   |
+| `quickstart`   | `/protect`      |
 | `runtime`      | `/live`         |
 | `ledger`       | `/evidence`     |
-| `agents`       | `/protect`      |
+| `agents`       | `/agents`       |
 | `enterprise`   | `/enterprise`   |
 | `attack`       | `/attack`       |
 | `playground`   | `/playground`   |

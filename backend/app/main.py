@@ -422,6 +422,15 @@ def auth_me(api_key=Depends(require_api_key)):
     }
 
 
+@app.get("/v1/auth/session-status")
+def auth_session_status(http_request: Request):
+    """Return browser-session presence without turning signed-out pages into 401 noise."""
+    return {
+        "authenticated": bool(get_api_key_hash_from_session(http_request)),
+        "csrf_ready": bool(get_csrf_token_from_session(http_request)),
+    }
+
+
 @app.get("/v1/auth/csrf")
 def auth_csrf(http_request: Request):
     token = get_csrf_token_from_session(http_request)

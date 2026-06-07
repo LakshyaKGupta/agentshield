@@ -690,6 +690,16 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertEqual(client.head("/health").status_code, 200)
         self.assertEqual(client.head("/ready").status_code, 200)
 
+    def test_session_status_is_quiet_when_signed_out(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+
+        client = TestClient(app)
+        resp = client.get("/v1/auth/session-status")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"authenticated": False, "csrf_ready": False})
+
     def test_envelope_encryptor_requires_real_key_material(self) -> None:
         from unittest.mock import patch
         from backend.app.security.encryption import EnvelopeEncryptor
