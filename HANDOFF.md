@@ -38,6 +38,25 @@
 
 ---
 
+## Session Update - 2026-06-07 (Firebase Authorized Domain Fix)
+
+### Objective
+- Fix live Google Sign-In error: `Firebase: Error (auth/unauthorized-domain)`.
+
+### Completed
+- Verified Firebase project: `agenteval1`.
+- Read current Firebase Auth authorized domains.
+- Added:
+  - `agentshield-sigma.vercel.app`
+  - `agentshield-ltcr3pyru-lakshyakguptas-projects.vercel.app`
+- Confirmed live Google Sign-In popup opens against Google Accounts from `https://agentshield-sigma.vercel.app/signup`.
+- Confirmed `auth/unauthorized-domain` no longer appears in page text or console during the popup launch.
+
+### Notes
+- The remaining browser messages are Google popup `Cross-Origin-Opener-Policy` warnings; they are not the Firebase unauthorized-domain failure.
+
+---
+
 ## Session Update - 2026-06-06 (Google Sign-In Configuration)
 
 ### Objective
