@@ -480,6 +480,7 @@ def _sdk_key_response(record):
         "id": str(record.id),
         "name": record.name,
         "key_prefix": record.key_prefix,
+        "key_type": getattr(record, "key_type", "sdk"),
         "scopes": record.scopes,
         "status": record.status,
         "created_at": record.created_at.isoformat(),
