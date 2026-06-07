@@ -1,3 +1,4 @@
+# AgentShield container and runner system configuration properties
 # Python
 __pycache__/
 *.py[cod]

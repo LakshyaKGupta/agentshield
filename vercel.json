@@ -1,3 +1,4 @@
+# AgentShield container and runner system configuration properties
 {
   "version": 2,
   "buildCommand": "cd frontend && npm ci && npm run build",

@@ -1,3 +1,4 @@
+# AgentShield container and runner system configuration properties
 services:
   - type: web
     name: agentshield-staging

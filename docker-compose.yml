@@ -1,3 +1,4 @@
+# AgentShield container and runner system configuration properties
 services:
   postgres:
     image: postgres:16-alpine
