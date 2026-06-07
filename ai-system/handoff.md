@@ -1,3 +1,4 @@
+<!-- AgentShield AI system context parameters -->
 # Handoff
 
 This file is the persistent project memory for AI agents and human contributors.
