@@ -4151,4 +4151,47 @@ Complete the remaining hardening items: Redis, KMS/HSM, SSO/SCIM, SIEM export, a
 - AWS KMS/HSM is implemented through `SIGNING_KEY_PROVIDER=kms` and `KMS_KEY_ARN`, but production Vercel currently lacks AWS/KMS credentials and a real KMS key.
 - OIDC/SCIM APIs are implemented, but production Vercel currently lacks `OIDC_*` and `SCIM_BEARER_TOKEN` values.
 - SIEM export is implemented through signed webhooks, but each workspace still needs a real webhook/SIEM URL configured in Settings.
-- Git history cleanup requires a history rewrite and force-push after the current changes are committed.
+- Git history cleanup was completed in the follow-up section below.
+
+## 2026-06-07 - Enterprise Integration Deployment and Secret-History Cleanup
+
+### User Request
+Finish the enterprise integration hardening pass, deploy it, verify it on the hosted website, and clean up the old leaked Groq key from Git history.
+
+### Changes Made
+- Rewrote Git history with `git-filter-repo` to replace the old Groq key literal with `***REMOVED_GROQ_KEY***`.
+- Force-pushed cleaned `main` to GitHub.
+- Deployed cleaned head `5d1154a` to Vercel production.
+- Production alias updated to `https://agentshield-sigma.vercel.app`.
+
+### Verification
+- History and working-tree secret checks:
+  - `git log --all -G'gsk_' -- . ':(exclude)archive'` returned no matches after rewrite.
+  - Strict `rg` provider-key scan returned no Groq/Tavily/OpenAI/GitHub-style literal keys in the working tree.
+- Local verification:
+  - `python3 -m unittest discover -s tests -v` passed: 48 tests, 3 skipped because no disposable local Postgres integration DB is configured.
+  - `cd frontend && npm run build` passed.
+- Hosted readiness:
+  - `GET https://agentshield-sigma.vercel.app/api/ready` returned `ready: true`, `store: postgres`, `database: connected`, and `ledger_valid: true`.
+  - `/ready` honestly reports `redis.mode: fallback`, `signing_key_provider: local`, `kms_hsm.status: not_configured`, and no OIDC/SCIM config because those provider env vars are still not set in Vercel.
+- Hosted real runtime smoke:
+  - Fresh signup succeeded through the deployed API.
+  - Agent registration succeeded.
+  - Real SDK key issuance succeeded.
+  - SDK-authenticated benign request returned `ALLOWED`.
+  - SDK-authenticated prompt injection returned `BLOCKED` and wrote ledger ID `162`.
+  - `/v1/enterprise/readiness` returned controls for Postgres, Redis, KMS/HSM, OIDC SSO, SCIM, SIEM export, and audit export.
+  - `/v1/enterprise/audit-export?format=json` returned tenant-scoped records.
+  - `/v1/enterprise/audit-export?format=csv` returned CSV with ledger/audit columns.
+  - SCIM create/list user endpoints worked for the fresh workspace.
+- Hosted frontend smoke:
+  - Public and deep-link routes `/`, `/signup`, `/signin`, `/dashboard`, `/protect`, `/live`, `/evidence`, `/enterprise`, and `/settings` loaded with HTTP 200, no blank pages, no console errors, and no failed browser requests.
+  - Mobile `390x844` smoke showed no horizontal overflow.
+  - Actual UI signup succeeded, then authenticated Dashboard, Protect Agent, Live Protection, Evidence, Enterprise, and Settings pages rendered without falling back to auth pages.
+
+### Remaining External Actions
+- Rotate the old Groq key in the Groq dashboard if it was ever real. History cleanup reduces repository exposure, but it cannot invalidate a provider key or remove copies from clones/caches.
+- Add a real free Redis URL, for example Upstash Redis protocol URL, to Vercel as `REDIS_URL` to move production rate limiting/session coordination from fallback mode to Redis-backed mode.
+- Add AWS KMS/HSM credentials and `KMS_KEY_ARN` only after creating a real KMS key. The code path is ready, but the provider cannot be configured without AWS account credentials.
+- Add real OIDC provider values (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`) and a generated `SCIM_BEARER_TOKEN` before claiming SSO/SCIM configured in production.
+- Configure a real SIEM/webhook destination per workspace in Settings before claiming SIEM export is live for that workspace.
