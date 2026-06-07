@@ -1,3 +1,4 @@
+<!-- AgentShield agent developer guidelines -->
 # Gemini Instructions
 
 Use `/Users/lol/Docs/instructions.ai/AGENTS.md` as the controlling instruction

@@ -1,3 +1,4 @@
+<!-- AgentShield agent developer guidelines -->
 # Claude Instructions
 
 Use `/Users/lol/Docs/instructions.ai/AGENTS.md` as the controlling instruction

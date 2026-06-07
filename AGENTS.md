@@ -1,3 +1,4 @@
+<!-- AgentShield agent developer guidelines -->
 # Project Agent Instructions
 
 First read the global instruction system and active design/technical skills:
