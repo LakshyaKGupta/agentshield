@@ -4110,3 +4110,45 @@ Perform a final startup-and-enterprise audit/fix pass, verify that the hosted pr
 - Hosted concurrent SDK/API traffic should no longer duplicate ledger IDs or lose successful decisions.
 - Hosted cross-tenant test must verify SDK key from Workspace A cannot operate Agent B.
 - Hosted startup flow must pass: signup -> register agent -> generate SDK key -> built-in verification -> external SDK/API traffic -> evidence -> kill switch.
+
+## 2026-06-07 - Enterprise Integration Surface Pass
+
+### User Request
+Complete the remaining hardening items: Redis, KMS/HSM, SSO/SCIM, SIEM export, audit export, and Git history cleanup/rotation for the previously exposed Groq key.
+
+### Changes Made
+- Added production readiness reporting for enterprise integrations.
+  - `/ready` now exposes `redis`, `signing_key_provider`, `kms_hsm`, and `sso` status fields.
+  - `/v1/enterprise/readiness` summarizes Postgres, Redis, KMS/HSM, OIDC SSO, SCIM, SIEM export, and audit export status from real configuration/workspace state.
+- Added tenant-scoped audit export.
+  - `GET /v1/enterprise/audit-export?format=json`
+  - `GET /v1/enterprise/audit-export?format=csv`
+  - Exports include ledger IDs, agent IDs, event type, source, verdict, timestamps, hashes, and event data.
+- Added SCIM-compatible user provisioning API for workspace automation.
+  - `GET /v1/scim/v2/Users`
+  - `POST /v1/scim/v2/Users`
+  - Uses existing workspace auth and persists users through the existing user store.
+- Added generic OIDC SSO integration endpoints.
+  - `GET /v1/sso/oidc/config`
+  - `GET /v1/sso/oidc/login`
+  - `GET /v1/sso/oidc/callback`
+  - Callback uses OIDC discovery, JWKS verification, issuer/audience checks, and creates an httpOnly AgentShield session.
+- Improved Redis limiter correctness.
+  - Redis sliding-window cleanup now removes the inserted UUID member when over limit instead of trying to remove a timestamp string.
+- Updated frontend Enterprise page to reflect live Redis, KMS/HSM, SSO/SCIM, and audit-export status from `/ready`.
+- Updated docs and env validation for Redis, KMS, OIDC, SCIM, SIEM, and audit export.
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed: 48 tests, 3 skipped because no disposable local Postgres integration DB is configured.
+- `python3 -m compileall backend/app sdk/python/agentshield scripts` passed.
+- `cd frontend && npm run build` passed.
+- Production environment validation passed with full example Redis/KMS/OIDC/SCIM variables.
+- `python3 scripts/export_openapi.py` regenerated `backend/openapi.json`.
+- Strict provider-key scan found no Groq/Tavily/OpenAI/GitHub-style literal keys in the working tree.
+
+### External Configuration Still Required
+- Redis is implemented and readiness-visible, but production Vercel currently has no `REDIS_URL`; add a free Upstash/Redis protocol URL before claiming Redis-backed production rate limiting.
+- AWS KMS/HSM is implemented through `SIGNING_KEY_PROVIDER=kms` and `KMS_KEY_ARN`, but production Vercel currently lacks AWS/KMS credentials and a real KMS key.
+- OIDC/SCIM APIs are implemented, but production Vercel currently lacks `OIDC_*` and `SCIM_BEARER_TOKEN` values.
+- SIEM export is implemented through signed webhooks, but each workspace still needs a real webhook/SIEM URL configured in Settings.
+- Git history cleanup requires a history rewrite and force-push after the current changes are committed.

@@ -69,6 +69,18 @@ def validate_environment(env: Mapping[str, str]) -> list[ReadinessFinding]:
     kms_key = env.get("KMS_KEY_ARN", "")
     if not kms_key and not demo_mode:
         findings.append(ReadinessFinding("warn", "KMS_KEY_ARN", "KMS/HSM-backed key custody is still required for production-grade signing keys."))
+    if env.get("SIGNING_KEY_PROVIDER", "local") == "kms" and not kms_key:
+        findings.append(ReadinessFinding("error", "KMS_KEY_ARN", "KMS_KEY_ARN is required when SIGNING_KEY_PROVIDER=kms."))
+
+    if not env.get("OIDC_ISSUER_URL") and not demo_mode:
+        findings.append(ReadinessFinding("warn", "OIDC_ISSUER_URL", "OIDC SSO is not configured. Set OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URI."))
+    if any(env.get(key) for key in ("OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET")):
+        for key in ("OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI"):
+            if not env.get(key):
+                findings.append(ReadinessFinding("error", key, f"{key} is required for OIDC SSO."))
+
+    if not env.get("SCIM_BEARER_TOKEN") and not demo_mode:
+        findings.append(ReadinessFinding("warn", "SCIM_BEARER_TOKEN", "SCIM directory sync is not configured. API-key protected SCIM endpoints remain available for workspace automation."))
 
     jwt_private = env.get("JWT_PRIVATE_KEY", "")
     if jwt_private and not re.search(r"BEGIN (RSA )?PRIVATE KEY", jwt_private):

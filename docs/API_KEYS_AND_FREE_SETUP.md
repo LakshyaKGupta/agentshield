@@ -51,6 +51,10 @@ Set:
 REDIS_URL=redis://host:6379/0
 ```
 
+Production status:
+- `/ready` reports `redis.configured`, `redis.connected`, and `redis.mode`.
+- If `REDIS_URL` is missing, AgentShield still runs with the in-process fallback, but this is not multi-instance production rate limiting.
+
 ## Optional LLM Chat Provider
 
 ### Groq
@@ -127,7 +131,57 @@ Only set `ALLOW_UNVERIFIED_FIREBASE_AUTH=true` for local sandbox testing.
 
 ```bash
 KMS_KEY_ARN=<provider key id or arn>
+SIGNING_KEY_PROVIDER=kms
 ```
+
+Production status:
+- `/ready` reports `signing_key_provider` and `kms_hsm`.
+- `SIGNING_KEY_PROVIDER=kms` requires AWS credentials and `KMS_KEY_ARN`.
+- Without this, AgentShield uses encrypted local/serverless key custody when `KEY_ENCRYPTION_KEY` is set, but not external HSM/KMS custody.
+
+## Optional Enterprise Identity
+
+### OIDC SSO
+- Purpose: redirect users through a real external identity provider.
+- Supported through generic OIDC discovery.
+
+```bash
+OIDC_ISSUER_URL=https://your-idp.example.com
+OIDC_CLIENT_ID=<client id>
+OIDC_CLIENT_SECRET=<client secret>
+OIDC_REDIRECT_URI=https://agentshield.example.com/api/v1/sso/oidc/callback
+```
+
+Endpoints:
+- `GET /v1/sso/oidc/config`
+- `GET /v1/sso/oidc/login`
+- `GET /v1/sso/oidc/callback`
+
+### SCIM
+- Purpose: directory-style user provisioning.
+- Workspace API-key protected SCIM endpoints are available for automation:
+
+```bash
+GET  /v1/scim/v2/Users
+POST /v1/scim/v2/Users
+```
+
+Set `SCIM_BEARER_TOKEN` when connecting a dedicated enterprise SCIM gateway/provider.
+
+## Audit Export And SIEM
+
+### Audit export
+- Tenant-scoped audit export is available in both JSON and CSV.
+
+```bash
+GET /v1/enterprise/audit-export?format=json
+GET /v1/enterprise/audit-export?format=csv
+```
+
+### SIEM export
+- Configure a signed webhook URL under Settings.
+- Blocked security events and webhook test events are signed with `X-AgentShield-Signature`.
+- `/v1/enterprise/readiness` reports whether SIEM export is configured.
 
 ## App URLs
 

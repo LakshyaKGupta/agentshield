@@ -9,10 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -86,17 +86,18 @@ def _check_rate_limit(client_ip: str, limit: int) -> None:
             now_epoch = time.time()
             clear_before = now_epoch - WINDOW_SECONDS
             key = f"rate_limit:{client_ip}"
+            member = str(uuid4())
             
             pipe = _redis_client.pipeline()
             pipe.zremrangebyscore(key, 0, clear_before)
             pipe.zcard(key)
-            pipe.zadd(key, {str(uuid4()): now_epoch})
+            pipe.zadd(key, {member: now_epoch})
             pipe.expire(key, WINDOW_SECONDS + 5)
             
             _, count, _, _ = pipe.execute()
             
             if count > limit:
-                _redis_client.zrem(key, str(now_epoch))
+                _redis_client.zrem(key, member)
                 raise HTTPException(
                     status_code=429,
                     detail={"code": "RATE_LIMIT_EXCEEDED", "message": f"Too many requests. Limit: {limit}/min."},
@@ -340,6 +341,10 @@ def ready():
         "version": settings.app_version,
         "store": store.backend_name,
         "database": db_connected,
+        "redis": _redis_readiness(),
+        "signing_key_provider": settings.signing_key_provider,
+        "kms_hsm": _kms_readiness(),
+        "sso": _sso_readiness(),
         "pool_active": pool_active,
         "pool_idle": pool_idle,
         "ledger_valid": ledger_status.valid,
@@ -354,6 +359,38 @@ def ready():
 @app.head("/ready", include_in_schema=False)
 def ready_head():
     return FastAPIResponse(status_code=200)
+
+
+def _redis_readiness() -> dict:
+    if not settings.redis_url:
+        return {"configured": False, "connected": False, "mode": "fallback"}
+    if _redis_client is None:
+        return {"configured": True, "connected": False, "mode": "fallback"}
+    try:
+        _redis_client.ping()
+        return {"configured": True, "connected": True, "mode": "redis"}
+    except Exception:
+        return {"configured": True, "connected": False, "mode": "fallback"}
+
+
+def _kms_readiness() -> dict:
+    provider = settings.signing_key_provider
+    configured = provider == "kms" and bool(settings.kms_key_arn)
+    return {
+        "provider": provider,
+        "configured": configured,
+        "key_arn_configured": bool(settings.kms_key_arn),
+        "status": "configured" if configured else "not_configured",
+    }
+
+
+def _sso_readiness() -> dict:
+    configured = all([settings.oidc_issuer_url, settings.oidc_client_id, settings.oidc_client_secret])
+    return {
+        "oidc_configured": bool(configured),
+        "scim_configured": bool(settings.scim_bearer_token),
+        "issuer": settings.oidc_issuer_url,
+    }
 
 
 @app.post("/v1/auth/signup")
@@ -2079,6 +2116,239 @@ def metrics(api_key=Depends(require_api_key)):
     }
 
 
+def _tenant_audit_rows(tid: UUID, include_setup: bool = True) -> list[dict]:
+    rows = []
+    for entry in store.ledger:
+        if entry.tenant_id != tid:
+            continue
+        source = _ledger_entry_source(entry)
+        if not include_setup and source != "live_runtime":
+            continue
+        rows.append(
+            {
+                "id": entry.id,
+                "tenant_id": str(entry.tenant_id),
+                "agent_id": str(entry.agent_id) if entry.agent_id else "",
+                "event_type": entry.event_type,
+                "source": source,
+                "severity": entry.severity.value,
+                "verdict": entry.verdict.value,
+                "created_at": entry.created_at.isoformat(),
+                "prev_hash": entry.prev_hash,
+                "curr_hash": entry.curr_hash,
+                "event_data": entry.event_data,
+            }
+        )
+    return rows
+
+
+@app.get("/v1/enterprise/readiness")
+def enterprise_readiness(api_key=Depends(require_api_key)):
+    tenant = store.tenants.get(api_key.tenant_id)
+    prefs = tenant.preferences if tenant else {}
+    tenant_agents = [agent for agent in store.agents.values() if agent.tenant_id == api_key.tenant_id and not _is_simulation_agent_record(agent)]
+    live_agents = [agent for agent in tenant_agents if agent.status == "active" and (agent.metadata or {}).get("live_connected")]
+    ledger_status = verify_ledger(store)
+    redis_state = _redis_readiness()
+    kms_state = _kms_readiness()
+    sso_state = _sso_readiness()
+    audit_rows = _tenant_audit_rows(api_key.tenant_id)
+    return {
+        "ready": ledger_status.valid and store.backend_name == "postgres",
+        "controls": {
+            "postgres": {"status": "operational" if store.backend_name == "postgres" else "not_configured"},
+            "redis": {"status": "operational" if redis_state["connected"] else "not_configured", **redis_state},
+            "kms_hsm": kms_state,
+            "sso_oidc": {"status": "configured" if sso_state["oidc_configured"] else "not_configured", **sso_state},
+            "scim": {"status": "configured" if sso_state["scim_configured"] else "not_configured"},
+            "siem_export": {"status": "configured" if prefs.get("webhook_url") else "not_configured", "webhook_url": prefs.get("webhook_url")},
+            "audit_export": {"status": "operational", "formats": ["json", "csv"], "records_available": len(audit_rows)},
+        },
+        "workspace": {
+            "agents_total": len(tenant_agents),
+            "agents_live_connected": len(live_agents),
+            "ledger_entries": len(audit_rows),
+            "ledger_valid": ledger_status.valid,
+        },
+    }
+
+
+@app.get("/v1/enterprise/audit-export")
+def enterprise_audit_export(
+    format: str = Query("json", pattern="^(json|csv)$"),
+    include_setup: bool = Query(True),
+    api_key=Depends(require_api_key),
+):
+    rows = _tenant_audit_rows(api_key.tenant_id, include_setup=include_setup)
+    exported_at = datetime.now(timezone.utc).isoformat()
+    if format == "json":
+        return {
+            "tenant_id": str(api_key.tenant_id),
+            "exported_at": exported_at,
+            "ledger_valid": verify_ledger(store).valid,
+            "records": rows,
+        }
+
+    import csv
+    import io
+
+    buffer = io.StringIO()
+    fieldnames = ["id", "tenant_id", "agent_id", "event_type", "source", "severity", "verdict", "created_at", "prev_hash", "curr_hash", "event_data"]
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        csv_row = dict(row)
+        csv_row["event_data"] = __import__("json").dumps(row["event_data"], sort_keys=True, default=str)
+        writer.writerow(csv_row)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="agentshield-audit-{api_key.tenant_id}.csv"'},
+    )
+
+
+@app.get("/v1/scim/v2/Users")
+def scim_list_users(api_key=Depends(require_api_key)):
+    members = [
+        {
+            "id": str(user.id),
+            "userName": user.email,
+            "active": True,
+            "roles": [{"value": user.role, "display": user.role}],
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        }
+        for user in store.users.values()
+        if user.tenant_id == api_key.tenant_id
+    ]
+    return {
+        "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+        "totalResults": len(members),
+        "Resources": members,
+        "startIndex": 1,
+        "itemsPerPage": len(members),
+    }
+
+
+@app.post("/v1/scim/v2/Users")
+def scim_create_user(body: dict, api_key=Depends(require_api_key)):
+    email = str(body.get("userName") or body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=422, detail={"code": "SCIM_USERNAME_REQUIRED", "message": "SCIM userName/email is required."})
+    role = "viewer"
+    roles = body.get("roles")
+    if isinstance(roles, list) and roles:
+        role = str(roles[0].get("value") if isinstance(roles[0], dict) else roles[0]).lower()
+    if role not in {"owner", "editor", "auditor", "viewer"}:
+        role = "viewer"
+    for user in store.users.values():
+        if user.tenant_id == api_key.tenant_id and user.email == email:
+            return {"id": str(user.id), "userName": user.email, "active": True, "roles": [{"value": user.role}]}
+
+    from .store import WorkspaceUser
+    from .services import _hash_password
+    import secrets
+
+    user = WorkspaceUser(
+        id=_uuid_mod.uuid4(),
+        tenant_id=api_key.tenant_id,
+        email=email,
+        password_hash=_hash_password(secrets.token_hex(32)),
+        role=role,
+    )
+    store.users[email] = user
+    store.persist_user(user)
+    return {"id": str(user.id), "userName": user.email, "active": True, "roles": [{"value": user.role}]}
+
+
+@app.get("/v1/sso/oidc/config")
+def oidc_config():
+    return {
+        "configured": bool(_sso_readiness()["oidc_configured"]),
+        "issuer": settings.oidc_issuer_url,
+        "client_id_configured": bool(settings.oidc_client_id),
+        "redirect_uri": settings.oidc_redirect_uri,
+    }
+
+
+@app.get("/v1/sso/oidc/login")
+def oidc_login():
+    if not _sso_readiness()["oidc_configured"]:
+        raise HTTPException(status_code=501, detail={"code": "OIDC_NOT_CONFIGURED", "message": "Configure OIDC_ISSUER_URL, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET."})
+    import secrets
+    from urllib.parse import urlencode
+    import httpx
+
+    discovery = httpx.get(f"{settings.oidc_issuer_url.rstrip('/')}/.well-known/openid-configuration", timeout=8.0).json()
+    auth_endpoint = discovery.get("authorization_endpoint")
+    if not auth_endpoint:
+        raise HTTPException(status_code=502, detail={"code": "OIDC_DISCOVERY_INVALID"})
+    state = secrets.token_urlsafe(18)
+    params = urlencode(
+        {
+            "client_id": settings.oidc_client_id,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "redirect_uri": settings.oidc_redirect_uri,
+            "state": state,
+        }
+    )
+    return RedirectResponse(f"{auth_endpoint}?{params}", status_code=302)
+
+
+@app.get("/v1/sso/oidc/callback")
+def oidc_callback(code: str, request: Request):
+    if not _sso_readiness()["oidc_configured"]:
+        raise HTTPException(status_code=501, detail={"code": "OIDC_NOT_CONFIGURED"})
+    import httpx
+    import jwt
+
+    discovery = httpx.get(f"{settings.oidc_issuer_url.rstrip('/')}/.well-known/openid-configuration", timeout=8.0).json()
+    token_endpoint = discovery.get("token_endpoint")
+    jwks_uri = discovery.get("jwks_uri")
+    if not token_endpoint or not jwks_uri:
+        raise HTTPException(status_code=502, detail={"code": "OIDC_DISCOVERY_INVALID"})
+    token_response = httpx.post(
+        token_endpoint,
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": settings.oidc_redirect_uri,
+            "client_id": settings.oidc_client_id,
+            "client_secret": settings.oidc_client_secret,
+        },
+        timeout=8.0,
+    )
+    if token_response.status_code >= 400:
+        raise HTTPException(status_code=401, detail={"code": "OIDC_TOKEN_EXCHANGE_FAILED"})
+    id_token = token_response.json().get("id_token")
+    if not id_token:
+        raise HTTPException(status_code=401, detail={"code": "OIDC_ID_TOKEN_MISSING"})
+    signing_key = jwt.PyJWKClient(jwks_uri).get_signing_key_from_jwt(id_token)
+    claims = jwt.decode(
+        id_token,
+        signing_key.key,
+        algorithms=["RS256", "ES256"],
+        audience=settings.oidc_client_id,
+        issuer=settings.oidc_issuer_url,
+    )
+    email = str(claims.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail={"code": "OIDC_EMAIL_MISSING"})
+    if email not in store.users:
+        auth = signup_workspace(
+            store,
+            settings,
+            WorkspaceSignupRequest(email=email, password=_uuid_mod.uuid4().hex + "Aa1!", workspace_name=f"{email.split('@')[-1]} SSO Workspace"),
+        )
+        raw_key = auth.api_key
+    else:
+        raw_key = create_api_key(store, settings, store.users[email].tenant_id)
+    frontend = __import__("os").getenv("FRONTEND_URL", "/dashboard")
+    redirect = RedirectResponse(f"{frontend.rstrip('/')}/dashboard", status_code=302)
+    _create_browser_session(redirect, request, raw_key)
+    return redirect
+
+
 @app.get("/v1/keys")
 def get_keys(api_key=Depends(require_api_key)):
     tid = api_key.tenant_id
@@ -2716,4 +2986,3 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
-

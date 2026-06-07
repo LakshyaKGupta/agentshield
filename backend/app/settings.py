@@ -25,6 +25,11 @@ class Settings:
     signing_key_provider: str = "local"
     key_encryption_key: str | None = None
     keys_dir: str | None = None
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_redirect_uri: str | None = None
+    scim_bearer_token: str | None = None
     allowed_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://localhost:5174",
@@ -61,6 +66,11 @@ def get_settings() -> Settings:
         signing_key_provider=get_secret("SIGNING_KEY_PROVIDER", "local"),
         key_encryption_key=get_secret("KEY_ENCRYPTION_KEY"),
         keys_dir=get_secret("KEYS_DIR"),
+        oidc_issuer_url=get_secret("OIDC_ISSUER_URL"),
+        oidc_client_id=get_secret("OIDC_CLIENT_ID"),
+        oidc_client_secret=get_secret("OIDC_CLIENT_SECRET"),
+        oidc_redirect_uri=get_secret("OIDC_REDIRECT_URI"),
+        scim_bearer_token=get_secret("SCIM_BEARER_TOKEN"),
         allowed_origins=allowed_origins,
         demo_mode=str(get_secret("DEMO_MODE", "false")).lower() in {"1", "true", "yes", "on"},
     )

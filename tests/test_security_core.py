@@ -4,6 +4,7 @@ from __future__ import annotations
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from uuid import uuid4
 
 from backend.app.contracts import AgentCreateRequest, AnalyzeRequest, PermissionManifest, Severity, ToolCallRequest, Verdict
 from backend.app.ledger.service import append_ledger_entry, verify_ledger
@@ -734,6 +735,64 @@ class SecurityCoreTests(unittest.TestCase):
 
         self.assertEqual(client.head("/health").status_code, 200)
         self.assertEqual(client.head("/ready").status_code, 200)
+        ready = client.get("/ready")
+        self.assertEqual(ready.status_code, 200)
+        ready_body = ready.json()
+        self.assertIn("redis", ready_body)
+        self.assertIn("kms_hsm", ready_body)
+        self.assertIn("sso", ready_body)
+
+    def test_enterprise_readiness_scim_and_audit_export_endpoints(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+
+        client = TestClient(app)
+        signup = client.post(
+            "/v1/auth/signup",
+            json={
+                "email": f"enterprise-{uuid4().hex[:8]}@example.com",
+                "password": "securepassword123",
+                "workspace_name": "Enterprise API Test",
+            },
+        )
+        self.assertEqual(signup.status_code, 200)
+        api_key = signup.json()["api_key"]
+        headers = {"X-AgentShield-API-Key": api_key}
+
+        agent = client.post(
+            "/v1/agents",
+            headers=headers,
+            json={
+                "name": "enterprise-agent",
+                "type": "user_agent",
+                "permissions": {"tools": {"web_search": ["read"]}, "default_action": "deny"},
+            },
+        )
+        self.assertEqual(agent.status_code, 200)
+
+        readiness = client.get("/v1/enterprise/readiness", headers=headers)
+        self.assertEqual(readiness.status_code, 200)
+        self.assertIn("audit_export", readiness.json()["controls"])
+
+        audit_json = client.get("/v1/enterprise/audit-export?format=json", headers=headers)
+        self.assertEqual(audit_json.status_code, 200)
+        self.assertIn("records", audit_json.json())
+
+        audit_csv = client.get("/v1/enterprise/audit-export?format=csv", headers=headers)
+        self.assertEqual(audit_csv.status_code, 200)
+        self.assertIn("text/csv", audit_csv.headers["content-type"])
+
+        scim_create = client.post(
+            "/v1/scim/v2/Users",
+            headers=headers,
+            json={"userName": f"auditor-{uuid4().hex[:8]}@example.com", "roles": [{"value": "auditor"}]},
+        )
+        self.assertEqual(scim_create.status_code, 200)
+        self.assertEqual(scim_create.json()["roles"][0]["value"], "auditor")
+
+        scim_list = client.get("/v1/scim/v2/Users", headers=headers)
+        self.assertEqual(scim_list.status_code, 200)
+        self.assertGreaterEqual(scim_list.json()["totalResults"], 2)
 
     def test_session_status_is_quiet_when_signed_out(self) -> None:
         from fastapi.testclient import TestClient

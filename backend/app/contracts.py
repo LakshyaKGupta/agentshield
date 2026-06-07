@@ -212,6 +212,10 @@ class ReadinessResponse(BaseModel):
     version: str
     store: Literal["in_memory", "postgres"]
     database: str
+    redis: dict = Field(default_factory=dict)
+    signing_key_provider: str = "local"
+    kms_hsm: dict = Field(default_factory=dict)
+    sso: dict = Field(default_factory=dict)
     pool_active: int
     pool_idle: int
     ledger_valid: bool

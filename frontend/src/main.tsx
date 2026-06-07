@@ -51,7 +51,16 @@ type Threat = { id: string; ledger_id: number; agent_id: string; attack_type: st
 type AppData = { apiKey: string; agents: Agent[]; ledger: LedgerEntry[]; threats: Threat[]; ledgerValid: boolean|null; settings: any | null; loading: boolean; error: string|null; apiKeys: any[]; activeSdkKeyExists?: boolean };
 type AuthResponse = { tenant_id: string; workspace_name: string; email: string; api_key: string };
 type SessionStatus = { authenticated: boolean; csrf_ready?: boolean };
-type ReadyStatus = { ready: boolean; store?: string; database?: string; ledger_valid?: boolean };
+type ReadyStatus = {
+  ready: boolean;
+  store?: string;
+  database?: string;
+  ledger_valid?: boolean;
+  redis?: { configured?: boolean; connected?: boolean; mode?: string };
+  signing_key_provider?: string;
+  kms_hsm?: { configured?: boolean; status?: string; provider?: string; key_arn_configured?: boolean };
+  sso?: { oidc_configured?: boolean; scim_configured?: boolean; issuer?: string };
+};
 type EnterpriseMetrics = {
   agents_total: number;
   agents_active: number;
@@ -2995,15 +3004,31 @@ function EnterprisePage({ setView, data, apiKey, onLogout }: { setView:(v:string
     },
     {
       label: "KMS / HSM Custody",
-      status: "Needs integration",
-      detail: "Current workspace identity is operational, but external KMS/HSM custody must be configured before enterprise production.",
-      ready: false,
+      status: readyStatus?.kms_hsm?.configured ? "Configured" : "Needs integration",
+      detail: readyStatus?.kms_hsm?.configured
+        ? `Signing provider is ${readyStatus.signing_key_provider || "kms"} with external key custody configured.`
+        : "Current workspace identity is operational, but external KMS/HSM custody must be configured before enterprise production.",
+      ready: Boolean(readyStatus?.kms_hsm?.configured),
     },
     {
       label: "SSO / Directory Sync",
-      status: "Needs integration",
-      detail: "Team RBAC exists. Enterprise SSO and SCIM-style directory sync are not configured in this workspace.",
-      ready: false,
+      status: readyStatus?.sso?.oidc_configured || readyStatus?.sso?.scim_configured ? "Partially configured" : "Needs integration",
+      detail: readyStatus?.sso?.oidc_configured || readyStatus?.sso?.scim_configured
+        ? `OIDC: ${readyStatus?.sso?.oidc_configured ? "configured" : "not configured"}; SCIM: ${readyStatus?.sso?.scim_configured ? "configured" : "not configured"}.`
+        : "Team RBAC exists. Enterprise SSO and SCIM-style directory sync are not configured in this workspace.",
+      ready: Boolean(readyStatus?.sso?.oidc_configured && readyStatus?.sso?.scim_configured),
+    },
+    {
+      label: "Redis Rate Limiting",
+      status: readyStatus?.redis?.connected ? "Operational" : "Needs integration",
+      detail: readyStatus?.redis?.connected ? "Cross-instance Redis-backed rate limiting is connected." : "Set REDIS_URL to enable cross-instance rate limiting; current deployment uses fallback behavior.",
+      ready: Boolean(readyStatus?.redis?.connected),
+    },
+    {
+      label: "Audit Export",
+      status: "Operational",
+      detail: "Tenant-scoped audit export is available as JSON and CSV from /v1/enterprise/audit-export.",
+      ready: true,
     },
   ];
   const readinessGaps = governanceItems
@@ -3229,9 +3254,9 @@ function EnterprisePage({ setView, data, apiKey, onLogout }: { setView:(v:string
               <div><strong>SDK/API Runtime</strong><span>{liveAgents.length ? "Live traffic observed" : "Waiting for first protected request"}</span></div>
               <div><strong>Signed Webhooks / SIEM</strong><span>{settings?.webhook_url ? "Configured" : "Not configured"}</span></div>
               <div><strong>Team RBAC</strong><span>{team.members.length ? `${team.members.length} member records` : "Owner-only workspace"}</span></div>
-              <div><strong>KMS/HSM</strong><span>Needs external key-provider integration</span></div>
-              <div><strong>SSO / Directory</strong><span>Needs provider integration</span></div>
-              <div><strong>Audit Export</strong><span>{data.ledger.length ? "Evidence available in ledger" : "Needs integration"}</span></div>
+              <div><strong>KMS/HSM</strong><span>{readyStatus?.kms_hsm?.configured ? "Configured" : "Needs external key-provider integration"}</span></div>
+              <div><strong>SSO / Directory</strong><span>{readyStatus?.sso?.oidc_configured || readyStatus?.sso?.scim_configured ? "Partially configured" : "Needs provider integration"}</span></div>
+              <div><strong>Audit Export</strong><span>JSON and CSV export available</span></div>
             </div>
           </div>
         </section>
