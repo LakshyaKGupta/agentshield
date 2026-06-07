@@ -1,6 +1,26 @@
 <!-- AgentShield project operation handoff registry -->
 # Agent Eval Handoff
 
+## Session Update - 2026-06-07 (OpenAPI / Swagger Auth Integration Fix)
+
+### Objective
+- Fix a bug where the Swagger UI / OpenAPI documentation did not expose authentication requirements correctly, causing Swagger requests to fail with `AUTH_API_KEY_MISSING`.
+
+### Actions Taken
+1. **Configured Custom OpenAPI Generator**:
+   - Modified `backend/app/main.py` to override `app.openapi` with a custom OpenAPI generator.
+   - Defined `X-AgentShield-API-Key`, `x-api-key`, and `BearerAuth` security schemes.
+   - Programmatically analyzed route dependency trees using a robust tree walker to identify all endpoints relying on the `require_api_key` dependency.
+   - Attached logical OR security requirements to all identified authenticated routes.
+2. **Added Verification Test**:
+   - Appended `test_openapi_schema_contains_security_schemes_and_requirements` in `tests/test_production_readiness.py` to ensure schema structure validity and path security attachment.
+3. **Pushed & Deployed**:
+   - Committed the changes and pushed them to GitHub.
+   - Deployed the changes to Vercel production (`https://agentshield-sigma.vercel.app`).
+   - Verified that `https://agentshield-sigma.vercel.app/openapi.json` returns the correct security requirements.
+
+---
+
 ## Session Update - 2026-06-07 (Repository Clean Up & README Enhancement)
 
 ### Objective
