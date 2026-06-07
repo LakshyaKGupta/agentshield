@@ -1,3 +1,4 @@
+<!-- AgentShield project operation handoff registry -->
 # Agent Eval Handoff
 
 ## Session Update - 2026-06-07 (Repository Clean Up & README Enhancement)
