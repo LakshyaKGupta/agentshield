@@ -11,13 +11,19 @@
    - Modified `backend/app/main.py` to override `app.openapi` with a custom OpenAPI generator.
    - Defined `X-AgentShield-API-Key`, `x-api-key`, and `BearerAuth` security schemes.
    - Programmatically analyzed route dependency trees using a robust tree walker to identify all endpoints relying on the `require_api_key` dependency.
-   - Attached logical OR security requirements to all identified authenticated routes.
+   - Attached logical OR security requirements to these paths in the OpenAPI schema.
 2. **Added Verification Test**:
    - Appended `test_openapi_schema_contains_security_schemes_and_requirements` in `tests/test_production_readiness.py` to ensure schema structure validity and path security attachment.
 3. **Pushed & Deployed**:
    - Committed the changes and pushed them to GitHub.
    - Deployed the changes to Vercel production (`https://agentshield-sigma.vercel.app`).
-   - Verified that `https://agentshield-sigma.vercel.app/openapi.json` returns the correct security requirements.
+4. **End-to-End Production Verification**:
+   - Wrote and ran a Playwright E2E browser test `verify_swagger.spec.ts` inside a clean chromium window.
+   - Verified that visiting `https://agentshield-sigma.vercel.app/docs` renders the "Authorize" button correctly.
+   - Successfully authenticated with a dynamically generated SDK key (`as_live_...`).
+   - Triggered `GET /v1/auth/me` from Swagger UI and confirmed it returns a HTTP `200 OK` response with the correct workspace JSON payload.
+   - Confirmed the generated `curl` snippet contains `-H 'X-AgentShield-API-Key: as_live_...'`.
+   - Captured and stored the verification screenshot `swagger_verification.png` in the artifacts directory.
 
 ---
 
