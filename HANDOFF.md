@@ -4232,3 +4232,35 @@ Configure the remaining provider-backed enterprise values rather than leaving re
 ### Still Requires Provider Account Setup
 - KMS/HSM cannot be truthfully configured without an AWS account, IAM credentials or workload identity, and a real KMS key ARN.
 - OIDC SSO cannot be truthfully configured without an identity provider app/client such as Google Workspace, Okta, Auth0, Clerk, or Azure AD and the issued client ID/client secret.
+
+## 2026-06-07 - Production White Screen Recovery Pass
+
+### User Request
+Fix intermittent white screens on `https://agentshield-sigma.vercel.app/`, update GitHub and Vercel, and fully inspect the production behavior.
+
+### Findings
+- Hosted `/api/ready` was healthy, with Postgres connected, Redis operational, SCIM configured, and the ledger valid.
+- The in-app browser reproduced the visible failure mode: the page loaded with title `AgentShield`, but `#root` stayed empty and no recovery UI appeared.
+- Standalone Chromium could load the page successfully, which pointed to an intermittent client boot/asset-load failure rather than a deterministic backend or route failure.
+- Local forced-failure testing by blocking the main Vite bundle reproduced an empty root. The first recovery-script draft had a quote-escaping syntax error in built HTML; that was fixed before deployment.
+
+### Changes Made
+- Added a boot watchdog to `frontend/index.html`.
+  - If React does not mount into `#root`, the page retries once with a cache-busting `__as_recover` query parameter.
+  - If the retry still does not mount, the page shows a branded recovery panel with a reload button instead of a blank white screen.
+  - The watchdog uses no localStorage/sessionStorage.
+- Added a `noscript` fallback for browsers with JavaScript disabled.
+- Added Vercel immutable caching headers for hashed `/assets/*` files and a short favicon cache.
+
+### Verification
+- `cd frontend && npm run build` passed.
+- `python3 -m json.tool vercel.json` passed.
+- Built inline watchdog script parsed successfully with `new Function(...)`.
+- Local Vite preview normal render mounted the app with `#root` text length `3629`.
+- Forced blocked-main-bundle simulation no longer stayed white:
+  - URL changed to `?__as_recover=...`.
+  - Recovery UI rendered with text: `The console did not finish loading`.
+
+### Notes
+- This does not hide real React errors; the existing React error boundary still handles render-time exceptions.
+- This specifically protects the pre-React blank-root failure class caused by interrupted/stale module or asset loading.

@@ -7,6 +7,80 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;color:#111;background:#fafaf8;">
+        <div style="max-width:520px;text-align:center;">
+          <h1 style="margin:0 0 12px;font-size:28px;">AgentShield needs JavaScript</h1>
+          <p style="margin:0;color:#666;line-height:1.6;">Enable JavaScript to use the AgentShield security console.</p>
+        </div>
+      </div>
+    </noscript>
+    <script>
+      (function () {
+        var recoveryParam = "__as_recover";
+        var rootSelector = "#root";
+        window.__agentshieldBootWatchdog = true;
+        function hasMountedApp() {
+          var root = document.querySelector(rootSelector);
+          return Boolean(root && root.childElementCount > 0 && root.textContent.trim().length > 0);
+        }
+        function removeRecoveryParam() {
+          try {
+            var url = new URL(window.location.href);
+            if (!url.searchParams.has(recoveryParam)) return;
+            url.searchParams.delete(recoveryParam);
+            window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+          } catch (_) {}
+        }
+        function renderRecovery() {
+          var root = document.querySelector(rootSelector);
+          if (!root || hasMountedApp()) return;
+          root.innerHTML = [
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;color:#111;background:#fafaf8;">',
+            '<div style="max-width:520px;text-align:center;padding:36px 28px;background:#fff;border:1px solid #e8e6e0;border-radius:20px;box-shadow:0 24px 60px rgba(17,17,17,.08);">',
+            '<p style="margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#65705d;">AgentShield console</p>',
+            '<h1 style="margin:0 0 12px;font-size:28px;line-height:1.15;">The console did not finish loading</h1>',
+            '<p style="margin:0 0 24px;color:#666;line-height:1.6;">This is usually a stale browser cache or interrupted asset load. Reload once to fetch a fresh build.</p>',
+            '<button type="button" id="agentshield-recovery-reload" style="border:0;border-radius:999px;background:#111;color:#fff;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;">Reload console</button>',
+            '</div>',
+            '</div>'
+          ].join('');
+          var reloadButton = document.getElementById("agentshield-recovery-reload");
+          if (reloadButton) {
+            reloadButton.addEventListener("click", function () {
+              try {
+                var url = new URL(window.location.href);
+                url.searchParams.delete(recoveryParam);
+                window.location.href = url.toString();
+              } catch (_) {
+                window.location.reload();
+              }
+            });
+          }
+        }
+        function scheduleBootCheck() {
+          window.setTimeout(function () {
+            if (hasMountedApp()) {
+              removeRecoveryParam();
+              return;
+            }
+            try {
+              var url = new URL(window.location.href);
+              if (!url.searchParams.has(recoveryParam)) {
+                url.searchParams.set(recoveryParam, String(Date.now()));
+                window.location.replace(url.toString());
+                return;
+              }
+            } catch (_) {}
+            renderRecovery();
+          }, 4500);
+          window.setTimeout(function () {
+            if (hasMountedApp()) removeRecoveryParam();
+          }, 7000);
+        }
+        scheduleBootCheck();
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
