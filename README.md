@@ -1,47 +1,69 @@
-# AgentShield
+# 🛡️ AgentShield
 
-AgentShield is a production-ready, full-stack runtime security middleware for autonomous AI agents. It provides deterministic prompt-injection screening, cryptographic agent identity validation via RS256 JWTs, deny-by-default permission manifests, an append-only tamper-evident ledger, secure webhook alert dispatching, multi-tenant RBAC team directories, and interactive behavioral risk profiling.
-
----
-
-## Technical Architecture
-
-*   **FastAPI Backend (`backend/app`)**: Secure REST and WebSocket API. Implements sliding-window IP rate-limiting, 1MB payload ceilings, 50+ threat regex patterns, Shannon character entropy analyzers, dynamic sandbox stress-testing fallbacks, and HMAC-SHA256 signed async webhooks.
-*   **Vite React Console (`frontend`)**: Sleek, high-fidelity security operator console with customizable themes, active navigation scrollspy, canvas-drawn ambient Hero orbs, settings vault navigation, and an interactive sliding behavioral profiling modal drawing custom SVG trust sparklines.
-*   **Packaged Python SDK (`sdk/python`)**: Complete packaging ready for PyPI publishing (`pyproject.toml`, `setup.py`, `README.md`), exposing the fully typed `AgentShield` client for LangChain or native integrations.
-*   **Durable Database Schema (`backend/migrations`)**: Robust schema supporting both in-memory and PostgreSQL engines, incorporating database-level triggers to guarantee the append-only ledger chain is immutable.
+AgentShield is a production-ready, high-performance runtime security middleware and monitoring console for autonomous AI agents. It provides deterministic prompt-injection screening, cryptographic agent identity validation via RS256 JWTs, deny-by-default permission manifests, an append-only tamper-evident ledger, secure webhook alert dispatching, multi-tenant RBAC team directories, and interactive behavioral risk profiling.
 
 ---
 
-## Multi-Device Local Network Hosting
+### 🌐 Live Production Application
+**Deploy & Monitor Live:** [https://agentshield-sigma.vercel.app](https://agentshield-sigma.vercel.app)
 
-To make AgentShield accessible to **any phone, tablet, or separate device** connected to the same Wi-Fi network:
+---
+
+## 🚀 Key Features
+
+*   **🔒 Deterministic Prompt Injection Protection**: Screen agent prompts in real-time with regex heuristics, entropy checks, and sandbox evaluations.
+*   **🔑 Cryptographic Identities**: Validate agent identities using secure RS256 JWT tokens.
+*   **📜 Tamper-Evident Security Ledger**: Verify the integrity of the transaction ledger with audit hashes.
+*   **📊 Behavioral Risk Profiling**: Live scoring, trust metrics, and anomaly detection.
+*   **🔔 Active Webhooks**: Fire HMAC-SHA256 signed webhook alerts to your systems instantly on security triggers.
+
+---
+
+## 🛠️ Repository Layout
+
+The codebase has been refactored and organized to separate key services, clients, and assets cleanly:
+
+*   [**`backend/`**](file:///Users/lol/Documents/Agent%20Eval/backend) — FastAPI REST and WebSocket server.
+*   [**`frontend/`**](file:///Users/lol/Documents/Agent%20Eval/frontend) — Vite React dashboard console.
+*   [**`sdk/`**](file:///Users/lol/Documents/Agent%20Eval/sdk) — Packaged SDKs for Python (`sdk/python`) and Node.js (`sdk/nodejs`).
+*   [**`scripts/`**](file:///Users/lol/Documents/Agent%20Eval/scripts) — Developer utilities, verification scripts, and OpenAPI exporters.
+*   [**`tests/`**](file:///Users/lol/Documents/Agent%20Eval/tests) — Backend unit tests and E2E Playwright test suites.
+*   [**`archive/`**](file:///Users/lol/Documents/Agent%20Eval/archive) — Legacy audit files, reports, and UI/UX design snapshots.
+    *   [`archive/audits/`](file:///Users/lol/Documents/Agent%20Eval/archive/audits) — Historical audit reports and snapshots.
+    *   [`archive/screenshots/`](file:///Users/lol/Documents/Agent%20Eval/archive/screenshots) — Design alignment, visual audits, and dashboard screenshots.
+    *   [`archive/documentation_pack/`](file:///Users/lol/Documents/Agent%20Eval/archive/documentation_pack) — Runbooks, threat models, and master production plans.
+
+---
+
+## 💻 Local Development Setup
+
+To run AgentShield on your local machine and make it accessible to other devices on your Wi-Fi network:
 
 ### 1. Launch the Backend Server
-Bind the FastAPI backend to all interfaces (`0.0.0.0`) on port `8000`:
+Bind the FastAPI backend to port `8000`:
 ```bash
 cd backend
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Launch the Frontend Console
-Bind the Vite dev server to all interfaces (`0.0.0.0`) on port `5173`:
+Bind the Vite dev server to port `5173`:
 ```bash
 cd frontend
-npm run dev
+npm run dev -- --host
 ```
-Vite will output the local network IP (e.g. `http://10.239.68.201:5173/`). Point any other device's browser to this IP. The frontend dynamically resolves the active host and channels all cryptographic operations back to your server with zero configuration!
+Point your web browser (or any mobile device/tablet on the same network) to the local network IP provided by Vite (e.g., `http://10.239.68.201:5173`).
 
 ---
 
-## Local Verification & Quality Gates
+## 🧪 Testing & Verification
 
-Run the comprehensive integration test suite (11/11 tests pass cleanly):
+Run the comprehensive Python unit test suite:
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Compile optimized production static assets:
+Compile static frontend assets:
 ```bash
 cd frontend
 npm run build
@@ -49,14 +71,13 @@ npm run build
 
 ---
 
-## Production Deployment Checklist
+## 🌐 Production Deployment Checklist
 
-1.  **Durable Database**: Set `DATABASE_URL=postgresql://user:pass@host:5432/dbname` on your server to auto-run migrations and persist cryptographic keys, invitations, and threat events.
-2.  **Harden Security**: Set `DEMO_MODE=false` in environment variables before hosting to enforce strict, uncompromised signature verification and disable fallback credentials.
-3.  **Publish the SDK**: Push the package to PyPI so developers can immediately run `pip install agentshield` globally:
+1.  **Durable Database**: Configure `DATABASE_URL=postgresql://user:pass@host:5432/dbname` to auto-run migrations and persist cryptographic keys, invitations, and threat events.
+2.  **Harden Security**: Set `DEMO_MODE=false` in your production environment variables to enforce strict signature verification and disable development fallback credentials.
+3.  **Publish the SDK**: Package and distribute the client package:
     ```bash
     cd sdk/python
     python3 -m build
     python3 -m twine upload dist/*
     ```
-
