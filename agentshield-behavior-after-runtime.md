@@ -1,0 +1,231 @@
+- generic [ref=e2]:
+  - generic [ref=e484]:
+    - complementary [ref=e485]:
+      - button "AgentShield" [ref=e486]:
+        - img [ref=e487]
+        - text: AgentShield
+      - navigation [ref=e491]:
+        - button "Dashboard" [ref=e492]:
+          - img [ref=e494]
+          - text: Dashboard
+        - button "Quick Start" [ref=e499]:
+          - img [ref=e501]
+          - text: Quick Start
+        - button "Agents" [ref=e503]:
+          - img [ref=e505]
+          - text: Agents
+        - button "Playground 🤖" [ref=e508]:
+          - img [ref=e510]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e514]:
+          - img [ref=e516]
+          - text: Ledger
+        - button "Attack Sim" [ref=e519]:
+          - img [ref=e521]
+          - text: Attack Sim
+        - button "Settings" [ref=e523]:
+          - img [ref=e525]
+          - text: Settings
+      - button "Sign out" [ref=e528]
+    - main [ref=e529]:
+      - generic [ref=e530]:
+        - heading "Agent Registry" [level=1] [ref=e531]
+        - button "+ Register Agent" [ref=e532]
+      - generic [ref=e533]:
+        - generic [ref=e534]:
+          - generic [ref=e535]: Fleet Security Score
+          - strong [ref=e536]: "85"
+          - generic [ref=e537]: Grade B · 1 live agent · simulations excluded
+        - generic [ref=e538]:
+          - generic [ref=e539]: Live Runtime Coverage
+          - strong [ref=e540]: "1"
+          - generic [ref=e541]: 0 disabled · token revocation backed by ledger writes
+        - generic [ref=e542]:
+          - generic [ref=e543]: Security Recommendations
+          - strong [ref=e544]: "1"
+          - generic [ref=e545]: Open behavior details for prioritized actions
+      - table [ref=e548]:
+        - rowgroup [ref=e549]:
+          - row "Name Type Security Score Connection Lifecycle Actions" [ref=e550]:
+            - columnheader "Name" [ref=e551]
+            - columnheader "Type" [ref=e552]
+            - columnheader "Security Score" [ref=e553]
+            - columnheader "Connection" [ref=e554]
+            - columnheader "Lifecycle" [ref=e555]
+            - columnheader "Actions" [ref=e556]
+        - rowgroup [ref=e557]:
+          - row "ResearchAgent research_agent 85 Grade B 🟢 Live Protected View Behavior Copy ID Disable" [ref=e558]:
+            - cell "ResearchAgent" [ref=e559]
+            - cell "research_agent" [ref=e560]:
+              - code [ref=e561]: research_agent
+            - cell "85 Grade B" [ref=e562]:
+              - generic [ref=e563]:
+                - generic [ref=e564]: "85"
+                - generic [ref=e565]: Grade B
+            - cell "🟢 Live" [ref=e566]:
+              - generic [ref=e567]: 🟢 Live
+            - cell "Protected" [ref=e568]:
+              - generic [ref=e569]: Protected
+            - cell "View Behavior Copy ID Disable" [ref=e570]:
+              - button "View Behavior" [active] [ref=e571]
+              - button "Copy ID" [ref=e572]
+              - button "Disable" [ref=e573]
+      - generic [ref=e576] [cursor=pointer]:
+        - generic [ref=e577]: ▶
+        - generic [ref=e578]:
+          - heading "🛡️ SDK Integration — Your credentials are pre-filled" [level=3] [ref=e579]
+          - paragraph [ref=e580]: "Using agent: ResearchAgent • ID: b5a0c55e-5ff6-4c..."
+      - generic [ref=e582]:
+        - generic [ref=e583]:
+          - generic [ref=e584]:
+            - heading "ResearchAgent" [level=2] [ref=e585]
+            - generic [ref=e586]: "ID: b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89"
+          - button "×" [ref=e587]
+        - generic [ref=e588]:
+          - heading "Runtime Evidence LIVE_RUNTIME source only" [level=3] [ref=e589]:
+            - generic [ref=e590]: Runtime Evidence
+            - generic [ref=e591]: LIVE_RUNTIME source only
+          - generic [ref=e592]:
+            - generic [ref=e593]:
+              - generic [ref=e594]: SDK Connected
+              - strong [ref=e595]: "True"
+            - generic [ref=e596]:
+              - generic [ref=e597]: Runtime Active
+              - strong [ref=e598]: "True"
+            - generic [ref=e599]:
+              - generic [ref=e600]: First Protected Request
+              - generic [ref=e601]: 2026-06-02 15:17:24 UTC
+            - generic [ref=e602]:
+              - generic [ref=e603]: Last Protected Request
+              - generic [ref=e604]: 2026-06-02 15:17:50 UTC
+            - generic [ref=e605]:
+              - generic [ref=e606]: Total Protected Requests
+              - strong [ref=e607]: "2"
+            - generic [ref=e608]:
+              - generic [ref=e609]: Total Allowed Requests
+              - strong [ref=e610]: "1"
+            - generic [ref=e611]:
+              - generic [ref=e612]: Total Blocked Threats
+              - strong [ref=e613]: "1"
+        - generic [ref=e614]: "Stage 3: Protected"
+        - generic [ref=e616]:
+          - heading "Agent Status Checklist" [level=4] [ref=e617]
+          - generic [ref=e618]:
+            - generic [ref=e619]:
+              - generic [ref=e620]: ✓
+              - generic [ref=e621]:
+                - strong [ref=e622]: Registered
+                - text: Agent registered in database with standard RS256.
+            - generic [ref=e623]:
+              - generic [ref=e624]: ✓
+              - generic [ref=e625]:
+                - strong [ref=e626]: Identity Issued
+                - text: Tenant-isolated JWT signature keys compiled.
+            - generic [ref=e627]:
+              - generic [ref=e628]: ✓
+              - generic [ref=e629]:
+                - strong [ref=e630]: SDK Connected
+                - text: Workspace SDK key spawned in settings.
+            - generic [ref=e631]:
+              - generic [ref=e632]: ✓
+              - generic [ref=e633]:
+                - strong [ref=e634]: Runtime Verified
+                - text: Handshake signature successfully decoded.
+            - generic [ref=e635]:
+              - generic [ref=e636]: ✓
+              - generic [ref=e637]:
+                - strong [ref=e638]: First Protected Request
+                - text: External LLM screening verified by ledger.
+            - generic [ref=e639]:
+              - generic [ref=e640]: ✓
+              - generic [ref=e641]:
+                - strong [ref=e642]: Security Analytics Available
+                - text: Live sparklines, recommendations, and matrix unlocked.
+        - generic [ref=e643]:
+          - generic [ref=e644]:
+            - img [ref=e645]
+            - generic [ref=e648]: "83"
+          - generic [ref=e649]:
+            - generic [ref=e650]:
+              - generic [ref=e651]: Guarded
+              - generic [ref=e652]: Grade B
+            - paragraph [ref=e653]: Security score blends trust decay, blocked attacks, tool violations, permission breadth, and active/disabled state.
+        - generic [ref=e654]:
+          - generic [ref=e655]:
+            - generic [ref=e656]: Trust Index
+            - strong [ref=e657]: 85%
+          - generic [ref=e658]:
+            - generic [ref=e659]: Blocked Attacks
+            - strong [ref=e660]: "1"
+          - generic [ref=e661]:
+            - generic [ref=e662]: Tool Violations
+            - strong [ref=e663]: "0"
+          - generic [ref=e664]:
+            - generic [ref=e665]: Kill Switch
+            - strong [ref=e666]: armed
+        - generic [ref=e667]:
+          - heading "Tool Manifest Permissions" [level=4] [ref=e668]
+          - paragraph [ref=e669]: Declared permissions gating access controls and action thresholds at runtime.
+          - generic [ref=e671]:
+            - strong [ref=e672]: web_search
+            - generic [ref=e673]: (read)
+        - group [ref=e674]:
+          - generic "Advanced Security Details" [ref=e675] [cursor=pointer]
+        - generic [ref=e676]:
+          - heading "Security Recommendations" [level=3] [ref=e677]
+          - paragraph [ref=e678]: Prioritized actions generated from this agent's permissions, threats, and ledger events.
+          - generic [ref=e680]:
+            - generic [ref=e681]:
+              - strong [ref=e682]: Harden inbound prompt screening
+              - generic [ref=e683]: warning
+            - paragraph [ref=e684]: 1 instruction override or jailbreak attempt(s) have been observed.
+            - text: Add stricter system-prompt isolation and keep tool execution behind AgentShield checks.
+        - generic [ref=e685]:
+          - heading "Historical Trust Index" [level=3] [ref=e686]
+          - paragraph [ref=e687]: Audit ledger verification sparkline timeline.
+          - img [ref=e688]
+        - generic [ref=e692]:
+          - heading "Threat Attack Matrix" [level=3] [ref=e693]
+          - paragraph [ref=e694]: Specific payload classification blocked counters.
+          - generic [ref=e695]:
+            - generic [ref=e696]:
+              - generic [ref=e697]: jailbreak
+              - generic [ref=e698]: "0"
+            - generic [ref=e699]:
+              - generic [ref=e700]: sql injection
+              - generic [ref=e701]: "0"
+            - generic [ref=e702]:
+              - generic [ref=e703]: role hijacking
+              - generic [ref=e704]: "0"
+            - generic [ref=e705]:
+              - generic [ref=e706]: shell injection
+              - generic [ref=e707]: "0"
+            - generic [ref=e708]:
+              - generic [ref=e709]: data exfiltration
+              - generic [ref=e710]: "0"
+            - generic [ref=e711]:
+              - generic [ref=e712]: ssrf open redirect
+              - generic [ref=e713]: "0"
+            - generic [ref=e714]:
+              - generic [ref=e715]: prompt exfiltration
+              - generic [ref=e716]: "0"
+            - generic [ref=e717]:
+              - generic [ref=e718]: instruction override
+              - generic [ref=e719]: "1"
+            - generic [ref=e720]:
+              - generic [ref=e721]: privilege escalation
+              - generic [ref=e722]: "0"
+            - generic [ref=e723]:
+              - generic [ref=e724]: system token injection
+              - generic [ref=e725]: "0"
+        - generic [ref=e726]:
+          - generic [ref=e727]:
+            - heading "Initialize SDK Client" [level=4] [ref=e728]
+            - button "Copy code" [ref=e729] [cursor=pointer]
+          - code [ref=e732]: "from agentshield import AgentShield shield = AgentShield( api_key=\"your_workspace_api_key\", agent_id=\"b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89\", agent_token=\"eyJhbGciOiJSUzI1Ni...\" ) # Screen inbound prompt verdict = shield.protect( prompt=\"User message...\", agent_id=\"b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89\" )"
+        - 'button "Kill Switch: Disable Agent" [ref=e734]'
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

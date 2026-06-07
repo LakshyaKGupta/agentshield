@@ -1880,14 +1880,15 @@ function Dashboard({ setView, data, onLogout }: { setView: (v:string)=>void; dat
   const { readyStatus, readyError } = useReadyStatus();
   const registeredAgents = data.agents.filter(agent => !isSimulationAgent(agent));
   const liveAgents = registeredAgents.filter(agent => agent.live_connected && agent.status !== "revoked");
-  const activeSdkKeys = data.apiKeys.filter(key => key.status === "active");
   const runtimeStats = liveRuntimeStats(data.ledger);
   const protectedRequestCount = runtimeStats.protectedRequests;
   const blockedThreatCount = runtimeStats.blockedThreats;
   const runtimeLedgerEntries = runtimeStats.entries;
   const lastBlocked = [...runtimeLedgerEntries].reverse().find(entry => entry.verdict === "BLOCKED");
   const hasAgent = registeredAgents.length > 0;
-  const hasSdkKey = activeSdkKeys.length > 0 || Boolean(data.activeSdkKeyExists);
+  // Only count keys that the backend confirmed are of key_type='sdk'.
+  // Session/workspace keys returned in /v1/api-keys must NOT satisfy this check.
+  const hasSdkKey = Boolean(data.activeSdkKeyExists);
   const hasRuntime = liveAgents.length > 0 || runtimeLedgerEntries.length > 0 || protectedRequestCount > 0;
   const firstProtected = runtimeLedgerEntries.length > 0 || protectedRequestCount > 0;
   const currentStep = !hasAgent ? 2 : !hasSdkKey ? 3 : !hasRuntime ? 4 : !firstProtected ? 5 : 5;
@@ -4759,7 +4760,9 @@ function QuickStartPage({ setView, data, spawnAgent, reload, onLogout }: { setVi
   const [verificationRunning, setVerificationRunning] = useState(false);
   const [verificationResult, setVerificationResult] = useState<string | null>(null);
 
-  const hasExistingSdkKey = Boolean(data.activeSdkKeyExists || data.apiKeys.some(key => key.status === "active"));
+  // Only treat an SDK key as existing if the backend confirmed key_type='sdk'.
+  // Session keys in data.apiKeys must not satisfy this check.
+  const hasExistingSdkKey = Boolean(data.activeSdkKeyExists);
   const displayKeyRaw = createdSdkKey?.api_key || (hasExistingSdkKey ? "<existing key hidden - create a new key to copy>" : "<create SDK key first>");
   const displayKey = createdSdkKey?.api_key
     ? (showKey ? displayKeyRaw : displayKeyRaw.slice(0, 12) + "••••••••••••••••")

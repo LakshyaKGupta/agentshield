@@ -1,0 +1,89 @@
+- generic [ref=e2]:
+  - generic [ref=e342]:
+    - complementary [ref=e343]:
+      - button "AgentShield" [ref=e344]:
+        - img [ref=e345]
+        - text: AgentShield
+      - navigation [ref=e349]:
+        - button "Dashboard" [ref=e350]:
+          - img [ref=e352]
+          - text: Dashboard
+        - button "Quick Start" [ref=e357]:
+          - img [ref=e359]
+          - text: Quick Start
+        - button "Agents" [ref=e361]:
+          - img [ref=e363]
+          - text: Agents
+        - button "Playground 🤖" [ref=e366]:
+          - img [ref=e368]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e372]:
+          - img [ref=e374]
+          - text: Ledger
+        - button "Attack Sim" [ref=e377]:
+          - img [ref=e379]
+          - text: Attack Sim
+        - button "Settings" [ref=e381]:
+          - img [ref=e383]
+          - text: Settings
+      - button "Sign out" [ref=e386]
+    - main [ref=e387]:
+      - generic [ref=e388]:
+        - heading "Security console" [level=1] [ref=e389]
+        - button "Run attack sim" [ref=e390]
+      - generic [ref=e391]:
+        - generic [ref=e392]:
+          - text: Ledger entries
+          - strong [ref=e393]: "0"
+        - generic [ref=e394]:
+          - text: Live protected events
+          - strong [ref=e395]: "0"
+        - generic [ref=e396]:
+          - text: Live threats
+          - strong [ref=e397]: "0"
+        - generic [ref=e398]:
+          - text: Ledger status
+          - strong [ref=e399]: ✓ Valid
+        - generic [ref=e400]:
+          - text: Live connected agents
+          - strong [ref=e401]: "0"
+      - generic [ref=e402]:
+        - generic [ref=e403]: Pristine Workspace
+        - heading "Welcome to your AgentShield Console" [level=2] [ref=e404]
+        - paragraph [ref=e405]: Secure, monitor, and audit your autonomous AI agents. Your workspace is currently empty. Follow these steps to register an AgentShield identity, create an SDK key, connect a real agent runtime, and inspect the tamper-proof ledger.
+        - 'button "⚡ Get Started: 3-Min Integration Guide →" [ref=e407]'
+        - generic [ref=e408]:
+          - generic [ref=e409]:
+            - generic [ref=e410]: "1"
+            - generic [ref=e411]:
+              - heading "Register your first AI agent" [level=4] [ref=e412]
+              - paragraph [ref=e413]: Generate cryptographic identity credentials (RS256 keypairs) to enforce tool access controls and track behavior metrics.
+              - button "Go to Agent Registry" [ref=e414]
+          - generic [ref=e415]:
+            - generic [ref=e416]: "2"
+            - generic [ref=e417]:
+              - heading "Create an SDK key and connect runtime traffic" [level=4] [ref=e418]
+              - paragraph [ref=e419]: Generate a one-time SDK key, place it in your server environment, then send a protected call from your Python or JavaScript agent.
+              - button "Open SDK Keys" [ref=e420]
+          - generic [ref=e421]:
+            - generic [ref=e422]: "3"
+            - generic [ref=e423]:
+              - heading "Run an internal security simulation" [level=4] [ref=e424]
+              - paragraph [ref=e425]: Use the simulator to test prompt injections, credential theft, and unauthorized tool executions. Simulator entries are ledger records, not live external-agent traffic.
+              - button "Open Attack Simulator" [ref=e426]
+          - generic [ref=e427]:
+            - generic [ref=e428]: "4"
+            - generic [ref=e429]:
+              - heading "Inspect the immutable ledger" [level=4] [ref=e430]
+              - paragraph [ref=e431]: Verify the SHA-256 cryptographic chain hash linkages across setup events, simulator records, and live runtime decisions.
+              - button "Verify Audit Ledger" [ref=e432]
+        - generic [ref=e433]:
+          - generic [ref=e434]:
+            - generic [ref=e435]: Quick Python SDK Integration
+            - code [ref=e436]: v0.1.0
+          - code [ref=e438]: pip install agentshield
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

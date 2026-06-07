@@ -1,0 +1,86 @@
+- generic [ref=e2]:
+  - generic [ref=e439]:
+    - complementary [ref=e440]:
+      - button "AgentShield" [ref=e441]:
+        - img [ref=e442]
+        - text: AgentShield
+      - navigation [ref=e446]:
+        - button "Dashboard" [ref=e447]:
+          - img [ref=e449]
+          - text: Dashboard
+        - button "Quick Start" [ref=e454]:
+          - img [ref=e456]
+          - text: Quick Start
+        - button "Agents" [ref=e458]:
+          - img [ref=e460]
+          - text: Agents
+        - button "Playground 🤖" [ref=e463]:
+          - img [ref=e465]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e469]:
+          - img [ref=e471]
+          - text: Ledger
+        - button "Attack Sim" [ref=e474]:
+          - img [ref=e476]
+          - text: Attack Sim
+        - button "Settings" [ref=e478]:
+          - img [ref=e480]
+          - text: Settings
+      - button "Sign out" [ref=e483]
+    - main [ref=e484]:
+      - generic [ref=e485]:
+        - heading "Agent Registry" [level=1] [ref=e486]
+        - button "+ Register Agent" [ref=e487]
+      - generic [ref=e517]:
+        - generic [ref=e518]:
+          - text: 🛡️
+          - strong [ref=e519]: Identity Envelope
+          - text: ": Registering an agent issues a cryptographic RS256 token. Your Python/JS code uses this to authenticate prompt screening and tool gating."
+        - generic [ref=e520]:
+          - generic [ref=e521]:
+            - generic [ref=e522]: Name
+            - textbox "Name" [ref=e523]: ResearchAgent
+          - generic [ref=e524]:
+            - generic [ref=e525]: Type
+            - combobox "Type" [ref=e526]:
+              - option "Research" [selected]
+              - option "Executor"
+              - option "Security"
+              - option "Custom..."
+          - generic [ref=e527]:
+            - generic [ref=e528]: Tool
+            - textbox "Tool" [ref=e529]: web_search
+          - generic [ref=e530]:
+            - generic [ref=e531]: Action
+            - textbox "Action" [ref=e532]: read
+        - button "Create & Get Code" [ref=e533]
+      - generic [ref=e489]:
+        - generic [ref=e490]: 🤖
+        - heading "No Protected Agents Registered" [level=3] [ref=e491]
+        - paragraph [ref=e492]: Register your first agent to get a cryptographic identity token. Then use one line of Python to protect every prompt.
+        - button "Register First Agent" [active] [ref=e493]
+      - generic [ref=e494]:
+        - generic [ref=e495] [cursor=pointer]:
+          - generic [ref=e496]:
+            - generic [ref=e497]: ▶
+            - generic [ref=e498]:
+              - heading "🛡️ SDK Integration — Your credentials are pre-filled" [level=3] [ref=e499]
+              - paragraph [ref=e500]: Register an agent above to auto-fill the agent ID below.
+          - generic [ref=e501]:
+            - button "Show API Key" [ref=e502]:
+              - img [ref=e503]
+            - button "Python" [ref=e506]
+            - button "Node.js" [ref=e507]
+            - button ".env" [ref=e508]
+        - generic [ref=e509]:
+          - generic [ref=e510]: "Install:"
+          - code [ref=e511]: pip install agentshield
+          - button "Copy" [ref=e512] [cursor=pointer]
+        - generic [ref=e513]:
+          - code [ref=e515]: "from agentshield import AgentShield # ── 1. Connect (no agent_id / token needed) ── shield = AgentShield(api_key=\"<your worksp••••••••••••••••\") # ── 2. Get or create your agent in one line ── agent = shield.agent(\"your-agent\") # agent_id is auto-resolved: created-after-registration # ── 3. Protect every inbound prompt ── verdict = agent.protect(\"Ignore all previous instructions and...\") print(f\"✅ Allowed: {verdict['allowed']} Trust: {verdict['trust_score_after']:.2f}\") # ── 4. Gate tool calls ── agent.check_tool(\"web_search\", \"read\") # raises SecurityBlocked if denied"
+          - button "Copy snippet" [ref=e516] [cursor=pointer]
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

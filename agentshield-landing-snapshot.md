@@ -1,0 +1,298 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - button "AgentShield" [ref=e6]:
+          - img [ref=e7]
+          - text: AgentShield
+        - navigation [ref=e11]:
+          - button "Features" [ref=e12]
+          - button "How it works" [ref=e13]
+          - button "Pricing" [ref=e14]
+        - generic [ref=e15]:
+          - button "Sign in" [ref=e16]
+          - button "Get started" [ref=e17]
+    - generic [ref=e18]:
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic [ref=e19]:
+        - heading "The security layer every AI agent needs" [level=1] [ref=e20]:
+          - text: The security layer
+          - text: every
+          - emphasis [ref=e21]: AI agent
+          - text: needs
+        - paragraph [ref=e22]: Identity verification, permission enforcement, and tamper-evident audit — synchronous protection on every message and tool call.
+        - generic [ref=e23]:
+          - button "Create workspace →" [ref=e24]
+          - button "See how it works" [ref=e25]
+      - generic [ref=e26]:
+        - paragraph [ref=e27]: Runtime stack and security controls
+        - generic [ref=e29]:
+          - generic [ref=e30]: FastAPI
+          - generic [ref=e31]: PostgreSQL
+          - generic [ref=e32]: Redis
+          - generic [ref=e33]: RS256 JWT
+          - generic [ref=e34]: Hash ledger
+          - generic [ref=e35]: WebSocket events
+          - generic [ref=e36]: Python SDK
+          - generic [ref=e37]: Vite console
+          - generic [ref=e38]: Firebase optional
+          - generic [ref=e39]: Groq optional
+          - generic [ref=e40]: FastAPI
+          - generic [ref=e41]: PostgreSQL
+          - generic [ref=e42]: Redis
+          - generic [ref=e43]: RS256 JWT
+          - generic [ref=e44]: Hash ledger
+          - generic [ref=e45]: WebSocket events
+          - generic [ref=e46]: Python SDK
+          - generic [ref=e47]: Vite console
+          - generic [ref=e48]: Firebase optional
+          - generic [ref=e49]: Groq optional
+          - generic [ref=e50]: FastAPI
+          - generic [ref=e51]: PostgreSQL
+          - generic [ref=e52]: Redis
+          - generic [ref=e53]: RS256 JWT
+          - generic [ref=e54]: Hash ledger
+          - generic [ref=e55]: WebSocket events
+          - generic [ref=e56]: Python SDK
+          - generic [ref=e57]: Vite console
+          - generic [ref=e58]: Firebase optional
+          - generic [ref=e59]: Groq optional
+    - generic [ref=e61]:
+      - generic [ref=e63]:
+        - paragraph [ref=e64]: By the numbers
+        - heading "Security that proves itself" [level=2] [ref=e65]
+        - paragraph [ref=e66]: Every metric is measured, every verdict is verifiable. AgentShield brings engineering rigour to autonomous AI.
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]: <200ms
+          - text: Synchronous guard path
+        - generic [ref=e71]:
+          - generic [ref=e72]: RS256
+          - text: Agent identity tokens
+        - generic [ref=e73]:
+          - generic [ref=e74]: SHA-256
+          - text: Hash-chained ledger
+        - generic [ref=e75]:
+          - generic [ref=e76]: 0 LLM
+          - text: Calls on hot path
+      - generic [ref=e77]:
+        - generic [ref=e79]:
+          - paragraph [ref=e80]: The readiness endpoint verifies service health, persistence, and ledger integrity before launch.
+          - generic [ref=e81]: Live readiness gate
+        - generic [ref=e83]:
+          - paragraph [ref=e84]: Every allowed, blocked, and flagged decision is written into a hash-chained audit record.
+          - generic [ref=e85]: Runtime ledger guarantee
+    - generic [ref=e87]:
+      - generic [ref=e89]:
+        - paragraph [ref=e90]: Platform
+        - heading "One runtime layer. Four security controls." [level=2] [ref=e91]:
+          - text: One runtime layer.
+          - text: Four security controls.
+        - paragraph [ref=e92]: Each protection runs synchronously so the guard path stays deterministic and your agents move at full speed.
+      - generic [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]: "01"
+          - img [ref=e98]
+          - heading "Identity that proves itself" [level=3] [ref=e101]
+          - paragraph [ref=e102]: Short-lived RS256 tokens give every agent a cryptographic identity before it touches any data or tool.
+        - generic [ref=e103]:
+          - generic [ref=e104]: "02"
+          - img [ref=e106]
+          - heading "Permissions that default to no" [level=3] [ref=e109]
+          - paragraph [ref=e110]: Deny-by-default manifests block unsafe tool calls before they execute. No policy means no action.
+        - generic [ref=e111]:
+          - generic [ref=e112]: "03"
+          - img [ref=e114]
+          - heading "A ledger that proves what happened" [level=3] [ref=e117]
+          - paragraph [ref=e118]: Hash-chained records make every verdict tamper-evident. One API call verifies the full chain.
+        - generic [ref=e119]:
+          - generic [ref=e120]: "04"
+          - img [ref=e122]
+          - heading "Detection on the fast path" [level=3] [ref=e124]
+          - paragraph [ref=e125]: Deterministic injection detection in <200ms. No external model on the synchronous guard path.
+    - generic [ref=e127]:
+      - generic [ref=e129]:
+        - paragraph [ref=e130]: Integration
+        - heading "Three API calls. Any agent framework." [level=2] [ref=e131]:
+          - text: Three API calls.
+          - text: Any agent framework.
+        - paragraph [ref=e132]: Drop AgentShield into Python, TypeScript, or any REST-capable agent framework in minutes.
+      - generic [ref=e133]:
+        - generic [ref=e134]:
+          - generic [ref=e136]:
+            - generic [ref=e137]: "1"
+            - generic [ref=e138]:
+              - code [ref=e139]: POST /v1/agents
+              - heading "Spawn a protected agent" [level=3] [ref=e140]
+              - paragraph [ref=e141]: Register an agent and receive a short-lived RS256 identity token with a deny-by-default permission manifest.
+          - generic [ref=e143]:
+            - generic [ref=e144]: "2"
+            - generic [ref=e145]:
+              - code [ref=e146]: POST /v1/shield/analyze
+              - heading "Analyze every message" [level=3] [ref=e147]
+              - paragraph [ref=e148]: Call the shield analyze endpoint before the agent processes any content. Get a verdict in <200ms.
+          - generic [ref=e150]:
+            - generic [ref=e151]: "3"
+            - generic [ref=e152]:
+              - code [ref=e153]: POST /v1/shield/tool-call
+              - heading "Guard every tool call" [level=3] [ref=e154]
+              - paragraph [ref=e155]: Call tool-call before executing web, file, or API tools. Blocked calls are ledgered automatically.
+        - generic [ref=e157]:
+          - generic [ref=e162]: agentshield · guard response
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - generic [ref=e165]: POST
+              - text: /v1/shield/tool-call
+            - generic [ref=e166]:
+              - generic [ref=e167]: "Authorization:"
+              - text: Bearer eyJ…
+            - generic [ref=e168]:
+              - generic [ref=e169]: "agent_id:"
+              - generic [ref=e170]: from registration
+            - generic [ref=e171]:
+              - generic [ref=e172]: BLOCKED
+              - generic [ref=e173]: · POLICY_DENIED
+            - generic [ref=e174]:
+              - generic [ref=e175]: ledger
+              - generic [ref=e176]: append-only
+              - generic [ref=e177]: · latency
+              - generic [ref=e178]: measured
+            - generic [ref=e179]:
+              - generic [ref=e180]: hash-chain
+              - generic [ref=e181]: ✓ verified
+            - generic [ref=e182]:
+              - generic [ref=e183]: trust_score
+              - generic [ref=e184]: 0.72→0.57
+    - generic [ref=e187]:
+      - generic [ref=e189]:
+        - paragraph [ref=e190]: Pricing
+        - heading "Simple plans for teams moving agents to production" [level=2] [ref=e191]:
+          - text: Simple plans for teams
+          - text: moving agents to production
+      - generic [ref=e192]:
+        - generic [ref=e194]:
+          - generic [ref=e195]:
+            - generic [ref=e196]: Local
+            - generic [ref=e197]: Free
+            - paragraph [ref=e198]: Run AgentShield locally with the full security API and dashboard.
+          - list [ref=e199]:
+            - listitem [ref=e200]:
+              - generic [ref=e201]: ✓
+              - text: Security API
+            - listitem [ref=e202]:
+              - generic [ref=e203]: ✓
+              - text: Python SDK
+            - listitem [ref=e204]:
+              - generic [ref=e205]: ✓
+              - text: Attack simulator
+            - listitem [ref=e206]:
+              - generic [ref=e207]: ✓
+              - text: Local dashboard
+            - listitem [ref=e208]:
+              - generic [ref=e209]: ✓
+              - text: Documentation
+          - button "Get started" [ref=e210]
+        - generic [ref=e212]:
+          - generic [ref=e213]: Most popular
+          - generic [ref=e214]:
+            - generic [ref=e215]: Self-hosted
+            - generic [ref=e216]: Free
+            - paragraph [ref=e217]: Deploy your own Postgres-backed runtime and bring your own infrastructure.
+          - list [ref=e218]:
+            - listitem [ref=e219]:
+              - generic [ref=e220]: ✓
+              - text: Everything in Local
+            - listitem [ref=e221]:
+              - generic [ref=e222]: ✓
+              - text: PostgreSQL persistence
+            - listitem [ref=e223]:
+              - generic [ref=e224]: ✓
+              - text: Redis rate limiting
+            - listitem [ref=e225]:
+              - generic [ref=e226]: ✓
+              - text: Audit retention
+            - listitem [ref=e227]:
+              - generic [ref=e228]: ✓
+              - text: Deployment monitoring
+          - button "Create workspace" [ref=e229]
+        - generic [ref=e231]:
+          - generic [ref=e232]:
+            - generic [ref=e233]: Enterprise controls
+            - generic [ref=e234]: Bring your stack
+            - paragraph [ref=e235]: Connect your own SSO, KMS/HSM, SIEM, and retention policies.
+          - list [ref=e236]:
+            - listitem [ref=e237]:
+              - generic [ref=e238]: ✓
+              - text: Everything in Self-hosted
+            - listitem [ref=e239]:
+              - generic [ref=e240]: ✓
+              - text: SSO / SAML integration
+            - listitem [ref=e241]:
+              - generic [ref=e242]: ✓
+              - text: Custom retention
+            - listitem [ref=e243]:
+              - generic [ref=e244]: ✓
+              - text: Hash anchoring
+            - listitem [ref=e245]:
+              - generic [ref=e246]: ✓
+              - text: Dedicated support process
+          - button "Open console" [ref=e247]
+    - generic [ref=e249]:
+      - heading "Give every agent a security handhold." [level=2] [ref=e250]:
+        - text: Give every agent
+        - text: a security handhold.
+      - paragraph [ref=e251]: Start protecting agent messages, tool calls, and handoffs in minutes — free forever for local evaluation.
+      - generic [ref=e252]:
+        - button "Create workspace" [ref=e253]:
+          - img [ref=e254]
+          - text: Create workspace
+        - button "Sign in" [ref=e258]
+    - contentinfo [ref=e259]:
+      - generic [ref=e260]:
+        - generic [ref=e261]:
+          - generic [ref=e262]:
+            - button "AgentShield" [ref=e263]:
+              - img [ref=e264]
+              - text: AgentShield
+            - paragraph [ref=e268]: Deterministic security middleware for autonomous AI agents. Built for the agent era.
+          - generic [ref=e269]:
+            - heading "Product" [level=4] [ref=e270]
+            - button "Features" [ref=e271]
+            - button "How it works" [ref=e272]
+            - button "Pricing" [ref=e273]
+            - button "Changelog" [ref=e274]
+          - generic [ref=e275]:
+            - heading "Developers" [level=4] [ref=e276]
+            - button "Docs" [ref=e277]
+            - button "API Reference" [ref=e278]
+            - button "Python SDK" [ref=e279]
+            - button "GitHub" [ref=e280]
+          - generic [ref=e281]:
+            - heading "Company" [level=4] [ref=e282]
+            - button "About" [ref=e283]
+            - button "Blog" [ref=e284]
+            - button "Contact" [ref=e285]
+            - button "Privacy" [ref=e286]
+        - generic [ref=e287]:
+          - generic [ref=e288]: © 2026 AgentShield
+          - generic [ref=e289]: Built for the autonomous agent era
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

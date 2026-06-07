@@ -1,0 +1,112 @@
+- generic [ref=e2]:
+  - generic [ref=e439]:
+    - complementary [ref=e440]:
+      - button "AgentShield" [ref=e441]:
+        - img [ref=e442]
+        - text: AgentShield
+      - navigation [ref=e446]:
+        - button "Dashboard" [ref=e447]:
+          - img [ref=e449]
+          - text: Dashboard
+        - button "Quick Start" [ref=e454]:
+          - img [ref=e456]
+          - text: Quick Start
+        - button "Agents" [ref=e458]:
+          - img [ref=e460]
+          - text: Agents
+        - button "Playground 🤖" [ref=e463]:
+          - img [ref=e465]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e469]:
+          - img [ref=e471]
+          - text: Ledger
+        - button "Attack Sim" [ref=e474]:
+          - img [ref=e476]
+          - text: Attack Sim
+        - button "Settings" [ref=e478]:
+          - img [ref=e480]
+          - text: Settings
+      - button "Sign out" [ref=e483]
+    - main [ref=e484]:
+      - generic [ref=e485]:
+        - heading "Agent Registry" [level=1] [ref=e486]
+        - button "+ Register Agent" [ref=e487]
+      - generic [ref=e534]:
+        - strong [ref=e535]: 1 agent registered but not yet connected.
+        - generic [ref=e536]: Security score and grade are only shown after the first real runtime request. Send traffic from your Python/JS agent using an SDK API key to activate protection.
+      - generic [ref=e537]:
+        - generic [ref=e538]:
+          - generic [ref=e539]: Fleet Security Score
+          - strong [ref=e540]: N/A
+          - generic [ref=e541]: Awaiting first live runtime request — connect your agent to see a score
+        - generic [ref=e542]:
+          - generic [ref=e543]: Live Runtime Coverage
+          - strong [ref=e544]: "0"
+          - generic [ref=e545]: 0 disabled · token revocation backed by ledger writes
+        - generic [ref=e546]:
+          - generic [ref=e547]: Security Recommendations
+          - strong [ref=e548]: "0"
+          - generic [ref=e549]: Open behavior details for prioritized actions
+      - table [ref=e550]:
+        - rowgroup [ref=e551]:
+          - row "Name Type Security Score Connection Lifecycle Actions" [ref=e552]:
+            - columnheader "Name" [ref=e553]
+            - columnheader "Type" [ref=e554]
+            - columnheader "Security Score" [ref=e555]
+            - columnheader "Connection" [ref=e556]
+            - columnheader "Lifecycle" [ref=e557]
+            - columnheader "Actions" [ref=e558]
+        - rowgroup [ref=e559]:
+          - row "ResearchAgent research_agent N/A No runtime traffic yet ⚪ Not Connected Registered View Behavior Copy ID Disable" [ref=e560]:
+            - cell "ResearchAgent" [ref=e561]
+            - cell "research_agent" [ref=e562]:
+              - code [ref=e563]: research_agent
+            - cell "N/A No runtime traffic yet" [ref=e564]:
+              - generic [ref=e566]:
+                - generic [ref=e567]: N/A
+                - generic [ref=e568]: No runtime traffic yet
+            - cell "⚪ Not Connected" [ref=e569]:
+              - generic [ref=e570]: ⚪ Not Connected
+            - cell "Registered" [ref=e571]:
+              - generic [ref=e572]: Registered
+            - cell "View Behavior Copy ID Disable" [ref=e573]:
+              - button "View Behavior" [ref=e574]
+              - button "Copy ID" [ref=e575]
+              - button "Disable" [ref=e576]
+      - generic [ref=e494]:
+        - generic [ref=e495] [cursor=pointer]:
+          - generic [ref=e496]:
+            - generic [ref=e497]: ▶
+            - generic [ref=e498]:
+              - heading "🛡️ SDK Integration — Your credentials are pre-filled" [level=3] [ref=e499]
+              - paragraph [ref=e500]: "Using agent: ResearchAgent • ID: b5a0c55e-5ff6-4c..."
+          - generic [ref=e501]:
+            - button "Show API Key" [ref=e502]:
+              - img [ref=e503]
+            - button "Python" [ref=e506]
+            - button "Node.js" [ref=e507]
+            - button ".env" [ref=e508]
+        - generic [ref=e509]:
+          - generic [ref=e510]: "Install:"
+          - code [ref=e511]: pip install agentshield
+          - button "Copy" [ref=e512] [cursor=pointer]
+        - generic [ref=e513]:
+          - code [ref=e515]: "from agentshield import AgentShield # ── 1. Connect (no agent_id / token needed) ── shield = AgentShield(api_key=\"<your worksp••••••••••••••••\") # ── 2. Get or create your agent in one line ── agent = shield.agent(\"ResearchAgent\") # agent_id is auto-resolved: b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89 # ── 3. Protect every inbound prompt ── verdict = agent.protect(\"Ignore all previous instructions and...\") print(f\"✅ Allowed: {verdict['allowed']} Trust: {verdict['trust_score_after']:.2f}\") # ── 4. Gate tool calls ── agent.check_tool(\"web_search\", \"read\") # raises SecurityBlocked if denied"
+          - button "Copy snippet" [ref=e516] [cursor=pointer]
+      - generic [ref=e578]:
+        - generic [ref=e579]: 🎉
+        - heading "Agent registered!" [level=3] [ref=e580]
+        - paragraph [ref=e581]:
+          - strong [ref=e582]: ResearchAgent
+          - text: is now protected. Your code is ready to run.
+        - generic [ref=e583]:
+          - generic [ref=e584]: from agentshield import AgentShield shield = AgentShield(api_key="<your worksp••••••••••••••••") agent = shield.agent("ResearchAgent") verdict = agent.protect("user message here") print(verdict['allowed'], verdict['trust_score_after'])
+          - button "Copy" [ref=e585] [cursor=pointer]
+        - generic [ref=e586]:
+          - button "Got it ✔" [ref=e587]
+          - button "Open Quick Start Guide →" [ref=e588] [cursor=pointer]
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

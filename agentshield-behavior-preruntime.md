@@ -1,0 +1,179 @@
+- generic [ref=e2]:
+  - generic [ref=e439]:
+    - complementary [ref=e440]:
+      - button "AgentShield" [ref=e441]:
+        - img [ref=e442]
+        - text: AgentShield
+      - navigation [ref=e446]:
+        - button "Dashboard" [ref=e447]:
+          - img [ref=e449]
+          - text: Dashboard
+        - button "Quick Start" [ref=e454]:
+          - img [ref=e456]
+          - text: Quick Start
+        - button "Agents" [ref=e458]:
+          - img [ref=e460]
+          - text: Agents
+        - button "Playground 🤖" [ref=e463]:
+          - img [ref=e465]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e469]:
+          - img [ref=e471]
+          - text: Ledger
+        - button "Attack Sim" [ref=e474]:
+          - img [ref=e476]
+          - text: Attack Sim
+        - button "Settings" [ref=e478]:
+          - img [ref=e480]
+          - text: Settings
+      - button "Sign out" [ref=e483]
+    - main [ref=e484]:
+      - generic [ref=e485]:
+        - heading "Agent Registry" [level=1] [ref=e486]
+        - button "+ Register Agent" [ref=e487]
+      - generic [ref=e534]:
+        - strong [ref=e535]: 1 agent registered but not yet connected.
+        - generic [ref=e536]: Security score and grade are only shown after the first real runtime request. Send traffic from your Python/JS agent using an SDK API key to activate protection.
+      - generic [ref=e537]:
+        - generic [ref=e538]:
+          - generic [ref=e539]: Fleet Security Score
+          - strong [ref=e540]: N/A
+          - generic [ref=e541]: Awaiting first live runtime request — connect your agent to see a score
+        - generic [ref=e542]:
+          - generic [ref=e543]: Live Runtime Coverage
+          - strong [ref=e544]: "0"
+          - generic [ref=e545]: 0 disabled · token revocation backed by ledger writes
+        - generic [ref=e546]:
+          - generic [ref=e547]: Security Recommendations
+          - strong [ref=e548]: "0"
+          - generic [ref=e549]: Open behavior details for prioritized actions
+      - table [ref=e550]:
+        - rowgroup [ref=e551]:
+          - row "Name Type Security Score Connection Lifecycle Actions" [ref=e552]:
+            - columnheader "Name" [ref=e553]
+            - columnheader "Type" [ref=e554]
+            - columnheader "Security Score" [ref=e555]
+            - columnheader "Connection" [ref=e556]
+            - columnheader "Lifecycle" [ref=e557]
+            - columnheader "Actions" [ref=e558]
+        - rowgroup [ref=e559]:
+          - row "ResearchAgent research_agent N/A No runtime traffic yet ⚪ Not Connected Registered View Behavior Copy ID Disable" [ref=e560]:
+            - cell "ResearchAgent" [ref=e561]
+            - cell "research_agent" [ref=e562]:
+              - code [ref=e563]: research_agent
+            - cell "N/A No runtime traffic yet" [ref=e564]:
+              - generic [ref=e566]:
+                - generic [ref=e567]: N/A
+                - generic [ref=e568]: No runtime traffic yet
+            - cell "⚪ Not Connected" [ref=e569]:
+              - generic [ref=e570]: ⚪ Not Connected
+            - cell "Registered" [ref=e571]:
+              - generic [ref=e572]: Registered
+            - cell "View Behavior Copy ID Disable" [ref=e573]:
+              - button "View Behavior" [active] [ref=e574]
+              - button "Copy ID" [ref=e575]
+              - button "Disable" [ref=e576]
+      - generic [ref=e494]:
+        - generic [ref=e495] [cursor=pointer]:
+          - generic [ref=e496]:
+            - generic [ref=e497]: ▶
+            - generic [ref=e498]:
+              - heading "🛡️ SDK Integration — Your credentials are pre-filled" [level=3] [ref=e499]
+              - paragraph [ref=e500]: "Using agent: ResearchAgent • ID: b5a0c55e-5ff6-4c..."
+          - generic [ref=e501]:
+            - button "Show API Key" [ref=e502]:
+              - img [ref=e503]
+            - button "Python" [ref=e506]
+            - button "Node.js" [ref=e507]
+            - button ".env" [ref=e508]
+        - generic [ref=e509]:
+          - generic [ref=e510]: "Install:"
+          - code [ref=e511]: pip install agentshield
+          - button "Copy" [ref=e512] [cursor=pointer]
+        - generic [ref=e513]:
+          - code [ref=e515]: "from agentshield import AgentShield # ── 1. Connect (no agent_id / token needed) ── shield = AgentShield(api_key=\"<your worksp••••••••••••••••\") # ── 2. Get or create your agent in one line ── agent = shield.agent(\"ResearchAgent\") # agent_id is auto-resolved: b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89 # ── 3. Protect every inbound prompt ── verdict = agent.protect(\"Ignore all previous instructions and...\") print(f\"✅ Allowed: {verdict['allowed']} Trust: {verdict['trust_score_after']:.2f}\") # ── 4. Gate tool calls ── agent.check_tool(\"web_search\", \"read\") # raises SecurityBlocked if denied"
+          - button "Copy snippet" [ref=e516] [cursor=pointer]
+      - generic [ref=e590]:
+        - generic [ref=e591]:
+          - generic [ref=e592]:
+            - heading "ResearchAgent" [level=2] [ref=e593]
+            - generic [ref=e594]: "ID: b5a0c55e-5ff6-4cf7-ab09-93449f9a8d89"
+          - button "×" [ref=e595]
+        - generic [ref=e596]:
+          - heading "Runtime Evidence LIVE_RUNTIME source only" [level=3] [ref=e597]:
+            - generic [ref=e598]: Runtime Evidence
+            - generic [ref=e599]: LIVE_RUNTIME source only
+          - generic [ref=e600]:
+            - generic [ref=e601]:
+              - generic [ref=e602]: SDK Connected
+              - strong [ref=e603]: "False"
+            - generic [ref=e604]:
+              - generic [ref=e605]: Runtime Active
+              - strong [ref=e606]: "False"
+            - generic [ref=e607]:
+              - generic [ref=e608]: First Protected Request
+              - generic [ref=e609]: Never
+            - generic [ref=e610]:
+              - generic [ref=e611]: Last Protected Request
+              - generic [ref=e612]: Never
+            - generic [ref=e613]:
+              - generic [ref=e614]: Total Protected Requests
+              - strong [ref=e615]: "0"
+            - generic [ref=e616]:
+              - generic [ref=e617]: Total Allowed Requests
+              - strong [ref=e618]: "0"
+            - generic [ref=e619]:
+              - generic [ref=e620]: Total Blocked Threats
+              - strong [ref=e621]: "0"
+        - generic [ref=e622]:
+          - generic [ref=e623]: "Stage 1: Registered & Awaiting SDK"
+          - heading "Identity Registered" [level=3] [ref=e624]
+          - paragraph [ref=e625]: Your agent's cryptographic envelope is secured in PostgreSQL. To establish a secure socket connection and receive runtime decisions, create an SDK key.
+          - generic [ref=e626]:
+            - heading "Agent Status Checklist" [level=4] [ref=e627]
+            - generic [ref=e628]:
+              - generic [ref=e629]:
+                - generic [ref=e630]: ✓
+                - generic [ref=e631]:
+                  - strong [ref=e632]: Registered
+                  - text: Agent registered in database with standard RS256.
+              - generic [ref=e633]:
+                - generic [ref=e634]: ✓
+                - generic [ref=e635]:
+                  - strong [ref=e636]: Identity Issued
+                  - text: Tenant-isolated JWT signature keys compiled.
+              - generic [ref=e637]:
+                - generic [ref=e638]: □
+                - generic [ref=e639]:
+                  - strong [ref=e640]: SDK Connected
+                  - text: Workspace SDK key spawned in settings.
+              - generic [ref=e641]:
+                - generic [ref=e642]: □
+                - generic [ref=e643]:
+                  - strong [ref=e644]: Runtime Verified
+                  - text: Handshake signature successfully decoded.
+              - generic [ref=e645]:
+                - generic [ref=e646]: □
+                - generic [ref=e647]:
+                  - strong [ref=e648]: First Protected Request
+                  - text: External LLM screening verified by ledger.
+              - generic [ref=e649]:
+                - generic [ref=e650]: □
+                - generic [ref=e651]:
+                  - strong [ref=e652]: Security Analytics Available
+                  - text: Live sparklines, recommendations, and matrix unlocked.
+          - generic [ref=e653]:
+            - heading "Tool Manifest Permissions" [level=4] [ref=e654]
+            - paragraph [ref=e655]: Declared permissions gating access controls and action thresholds at runtime.
+            - generic [ref=e657]:
+              - strong [ref=e658]: web_search
+              - generic [ref=e659]: (read)
+          - group [ref=e660]:
+            - generic "Advanced Security Details" [ref=e661] [cursor=pointer]
+          - button "⚡ Generate SDK API Key →" [ref=e662]
+        - button "Kill Switch Inactive (No traffic)" [disabled] [ref=e664]
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

@@ -1,0 +1,109 @@
+- generic [ref=e2]:
+  - generic [ref=e785]:
+    - complementary [ref=e786]:
+      - button "AgentShield" [ref=e787]:
+        - img [ref=e788]
+        - text: AgentShield
+      - navigation [ref=e792]:
+        - button "Dashboard" [ref=e793]:
+          - img [ref=e795]
+          - text: Dashboard
+        - button "Quick Start" [ref=e800]:
+          - img [ref=e802]
+          - text: Quick Start
+        - button "Agents" [ref=e804]:
+          - img [ref=e806]
+          - text: Agents
+        - button "Playground 🤖" [ref=e809]:
+          - img [ref=e811]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e815]:
+          - img [ref=e817]
+          - text: Ledger
+        - button "Attack Sim" [ref=e820]:
+          - img [ref=e822]
+          - text: Attack Sim
+        - button "Settings" [ref=e824]:
+          - img [ref=e826]
+          - text: Settings
+      - button "Sign out" [ref=e829]
+    - main [ref=e830]:
+      - generic [ref=e831]:
+        - heading "Security console" [level=1] [ref=e832]
+        - button "Run attack sim" [ref=e833]
+      - generic [ref=e834]:
+        - generic [ref=e835]:
+          - text: Ledger entries
+          - strong [ref=e836]: "1"
+        - generic [ref=e837]:
+          - text: Live protected events
+          - strong [ref=e838]: "0"
+        - generic [ref=e839]:
+          - text: Live threats
+          - strong [ref=e840]: "0"
+        - generic [ref=e841]:
+          - text: Ledger status
+          - strong [ref=e842]: ✓ Valid
+        - generic [ref=e843]:
+          - text: Live connected agents
+          - strong [ref=e844]: "0"
+      - generic [ref=e845]:
+        - generic [ref=e846]:
+          - generic [ref=e847]: "Workspace Status:"
+          - generic [ref=e848]: Awaiting SDK Connection
+        - generic [ref=e849]: Monitoring is configured, but no external SDK traffic has connected yet. Live runtime metrics are zero.
+      - generic [ref=e850]:
+        - generic [ref=e851]:
+          - generic [ref=e852]: Security Telemetry & Live Threat Analytics
+          - generic [ref=e853]:
+            - generic [ref=e854]: "Total Events (Scale: 0 - 10)"
+            - generic [ref=e856]: "Threats Blocked (Scale: 0 - 5)"
+        - generic [ref=e858]:
+          - generic [ref=e859]:
+            - generic [ref=e860]: Events Screened (7h)
+            - generic [ref=e861]:
+              - generic [ref=e862]: "0"
+              - generic [ref=e863]: avg 0/h
+          - generic [ref=e864]:
+            - generic [ref=e865]: Threats Intercepted
+            - generic [ref=e867]:
+              - generic [ref=e868]: "0"
+              - generic [ref=e869]: 100% blocked
+          - generic [ref=e870]:
+            - generic [ref=e871]: Shield Integrity
+            - generic [ref=e873]:
+              - generic [ref=e874]: 100%
+              - generic [ref=e875]: Active shielding
+        - img [ref=e877]:
+          - generic [ref=e878]: "10"
+          - generic [ref=e879]: "5"
+          - generic [ref=e880]: "0"
+          - generic [ref=e881]: "5"
+          - generic [ref=e882]: "3"
+          - generic [ref=e883]: "0"
+          - generic [ref=e898]: "-7h"
+          - generic [ref=e899]: "-6h"
+          - generic [ref=e900]: "-5h"
+          - generic [ref=e901]: "-4h"
+          - generic [ref=e902]: "-3h"
+          - generic [ref=e903]: "-2h"
+          - generic [ref=e904]: "-1h"
+      - generic [ref=e912]:
+        - generic [ref=e913]:
+          - generic [ref=e914]: Event feed
+          - generic [ref=e915]:
+            - generic [ref=e916]: ALLOWED
+            - generic [ref=e917]: ResearchAgent
+            - generic [ref=e918]: auth
+            - generic [ref=e919]: registered
+            - generic [ref=e920]: "#6"
+        - generic [ref=e921]:
+          - generic [ref=e922]: Threats
+          - generic [ref=e923]:
+            - paragraph [ref=e924]: No live runtime threats have been recorded. Internal simulations are excluded from this count.
+            - generic [ref=e925]: Live Threat Count Clean
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

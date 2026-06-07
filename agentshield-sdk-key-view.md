@@ -1,0 +1,72 @@
+- generic [ref=e2]:
+  - generic [ref=e665]:
+    - complementary [ref=e666]:
+      - button "AgentShield" [ref=e667]:
+        - img [ref=e668]
+        - text: AgentShield
+      - navigation [ref=e672]:
+        - button "Dashboard" [ref=e673]:
+          - img [ref=e675]
+          - text: Dashboard
+        - button "Quick Start" [ref=e680]:
+          - img [ref=e682]
+          - text: Quick Start
+        - button "Agents" [ref=e684]:
+          - img [ref=e686]
+          - text: Agents
+        - button "Playground 🤖" [ref=e689]:
+          - img [ref=e691]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e695]:
+          - img [ref=e697]
+          - text: Ledger
+        - button "Attack Sim" [ref=e700]:
+          - img [ref=e702]
+          - text: Attack Sim
+        - button "Settings" [ref=e704]:
+          - img [ref=e706]
+          - text: Settings
+      - button "Sign out" [ref=e709]
+    - main [ref=e710]:
+      - heading "Settings & Personalization" [level=1] [ref=e712]
+      - generic [ref=e713]:
+        - button "General" [ref=e714]
+        - button "Personalization" [ref=e715]
+        - button "SDK API Keys" [ref=e716]
+        - button "Cryptographic Vault" [ref=e717]
+        - button "Webhook Alerts" [ref=e718]
+        - button "Team Directory" [ref=e719]
+      - generic [ref=e720]:
+        - generic [ref=e721]:
+          - generic [ref=e722]: Appearance
+          - generic [ref=e723]:
+            - generic [ref=e724]:
+              - generic [ref=e725]: Theme
+              - generic [ref=e726]:
+                - button "Light" [ref=e727]
+                - button "Dark" [ref=e728]
+                - button "System" [ref=e729]
+            - generic [ref=e730]:
+              - generic [ref=e731]: Interactive Custom CursorVisual magnetic cursor with soft trailing glow. Disable for default system cursor.
+              - switch [checked] [ref=e732]
+        - generic [ref=e734]:
+          - generic [ref=e735]: Notifications
+          - generic [ref=e736]:
+            - generic [ref=e737]: Security alerts
+            - switch [checked] [ref=e738]
+        - generic [ref=e740]:
+          - generic [ref=e741]: Agent Defaults
+          - generic [ref=e742]:
+            - generic [ref=e743]: Default token TTL (seconds)
+            - spinbutton [ref=e744]: "3600"
+        - generic [ref=e745]:
+          - generic [ref=e746]: Audit & Compliance
+          - generic [ref=e747]:
+            - generic [ref=e748]: Ledger retention (days)
+            - spinbutton [ref=e749]: "30"
+        - button "Save changes" [ref=e751]
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

@@ -1,0 +1,43 @@
+- generic [ref=e2]:
+  - generic [ref=e766]:
+    - banner [ref=e767]:
+      - generic [ref=e768]:
+        - button "AgentShield" [ref=e769]:
+          - img [ref=e770]
+          - text: AgentShield
+        - navigation [ref=e774]:
+          - button "Features" [ref=e775]
+          - button "How it works" [ref=e776]
+          - button "Pricing" [ref=e777]
+        - generic [ref=e778]:
+          - button "Sign in" [ref=e779]
+          - button "Get started" [ref=e780]
+    - generic [ref=e782]:
+      - img [ref=e784]
+      - heading "Welcome back" [level=1] [ref=e788]
+      - paragraph [ref=e789]:
+        - text: New to AgentShield?
+        - button "Create account" [ref=e790]
+      - generic [ref=e791]:
+        - generic [ref=e792]:
+          - text: Email address
+          - textbox "Email address" [ref=e793]:
+            - /placeholder: you@example.com
+            - text: ui-score-6102@example.com
+        - generic [ref=e794]:
+          - text: Password
+          - generic [ref=e795]:
+            - textbox "Password Show" [ref=e796]:
+              - /placeholder: Minimum 6 characters
+              - text: Password123!
+            - button "Show" [ref=e797]
+        - button "Sign in" [ref=e798]
+      - generic [ref=e800]: or
+      - button "Continue with Google" [ref=e801]:
+        - img [ref=e802]
+        - text: Continue with Google
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

@@ -1,0 +1,82 @@
+- generic [ref=e2]:
+  - generic [ref=e484]:
+    - complementary [ref=e485]:
+      - button "AgentShield" [ref=e486]:
+        - img [ref=e487]
+        - text: AgentShield
+      - navigation [ref=e491]:
+        - button "Dashboard" [ref=e492]:
+          - img [ref=e494]
+          - text: Dashboard
+        - button "Quick Start" [ref=e499]:
+          - img [ref=e501]
+          - text: Quick Start
+        - button "Agents" [ref=e503]:
+          - img [ref=e505]
+          - text: Agents
+        - button "Playground 🤖" [ref=e508]:
+          - img [ref=e510]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e514]:
+          - img [ref=e516]
+          - text: Ledger
+        - button "Attack Sim" [ref=e519]:
+          - img [ref=e521]
+          - text: Attack Sim
+        - button "Settings" [ref=e523]:
+          - img [ref=e525]
+          - text: Settings
+      - button "Sign out" [ref=e528]
+    - main [ref=e529]:
+      - generic [ref=e530]:
+        - heading "Agent Registry" [level=1] [ref=e531]
+        - button "+ Register Agent" [ref=e532]
+      - generic [ref=e533]:
+        - generic [ref=e534]:
+          - generic [ref=e535]: Fleet Security Score
+          - strong [ref=e536]: "85"
+          - generic [ref=e537]: Grade B · 1 live agent · simulations excluded
+        - generic [ref=e538]:
+          - generic [ref=e539]: Live Runtime Coverage
+          - strong [ref=e540]: "1"
+          - generic [ref=e541]: 0 disabled · token revocation backed by ledger writes
+        - generic [ref=e542]:
+          - generic [ref=e543]: Security Recommendations
+          - strong [ref=e544]: "1"
+          - generic [ref=e545]: Open behavior details for prioritized actions
+      - table [ref=e548]:
+        - rowgroup [ref=e549]:
+          - row "Name Type Security Score Connection Lifecycle Actions" [ref=e550]:
+            - columnheader "Name" [ref=e551]
+            - columnheader "Type" [ref=e552]
+            - columnheader "Security Score" [ref=e553]
+            - columnheader "Connection" [ref=e554]
+            - columnheader "Lifecycle" [ref=e555]
+            - columnheader "Actions" [ref=e556]
+        - rowgroup [ref=e557]:
+          - row "ResearchAgent research_agent 85 Grade B 🟢 Live Protected View Behavior Copy ID Disable" [ref=e558]:
+            - cell "ResearchAgent" [ref=e559]
+            - cell "research_agent" [ref=e560]:
+              - code [ref=e561]: research_agent
+            - cell "85 Grade B" [ref=e562]:
+              - generic [ref=e563]:
+                - generic [ref=e564]: "85"
+                - generic [ref=e565]: Grade B
+            - cell "🟢 Live" [ref=e566]:
+              - generic [ref=e567]: 🟢 Live
+            - cell "Protected" [ref=e568]:
+              - generic [ref=e569]: Protected
+            - cell "View Behavior Copy ID Disable" [ref=e570]:
+              - button "View Behavior" [ref=e571]
+              - button "Copy ID" [ref=e572]
+              - button "Disable" [ref=e573]
+      - generic [ref=e576] [cursor=pointer]:
+        - generic [ref=e577]: ▶
+        - generic [ref=e578]:
+          - heading "🛡️ SDK Integration — Your credentials are pre-filled" [level=3] [ref=e579]
+          - paragraph [ref=e580]: "Using agent: ResearchAgent • ID: b5a0c55e-5ff6-4c..."
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

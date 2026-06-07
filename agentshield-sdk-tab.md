@@ -1,0 +1,59 @@
+- generic [ref=e2]:
+  - generic [ref=e665]:
+    - complementary [ref=e666]:
+      - button "AgentShield" [ref=e667]:
+        - img [ref=e668]
+        - text: AgentShield
+      - navigation [ref=e672]:
+        - button "Dashboard" [ref=e673]:
+          - img [ref=e675]
+          - text: Dashboard
+        - button "Quick Start" [ref=e680]:
+          - img [ref=e682]
+          - text: Quick Start
+        - button "Agents" [ref=e684]:
+          - img [ref=e686]
+          - text: Agents
+        - button "Playground 🤖" [ref=e689]:
+          - img [ref=e691]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e695]:
+          - img [ref=e697]
+          - text: Ledger
+        - button "Attack Sim" [ref=e700]:
+          - img [ref=e702]
+          - text: Attack Sim
+        - button "Settings" [ref=e704]:
+          - img [ref=e706]
+          - text: Settings
+      - button "Sign out" [ref=e709]
+    - main [ref=e710]:
+      - heading "Settings & Personalization" [level=1] [ref=e712]
+      - generic [ref=e713]:
+        - button "General" [ref=e714]
+        - button "Personalization" [ref=e715]
+        - button "SDK API Keys" [active] [ref=e716]
+        - button "Cryptographic Vault" [ref=e717]
+        - button "Webhook Alerts" [ref=e718]
+        - button "Team Directory" [ref=e719]
+      - generic [ref=e753]:
+        - generic [ref=e754]:
+          - generic [ref=e755]:
+            - generic [ref=e756]: SDK API Keys
+            - paragraph [ref=e757]: Create one-time visible API keys for SDKs, agents, CI jobs, and server-side integrations. Keys are hashed at rest and the full secret is shown only once.
+          - button "Refresh" [ref=e758]
+        - generic [ref=e759]:
+          - generic [ref=e760]:
+            - generic [ref=e761]: Key name
+            - textbox "Key name" [ref=e762]:
+              - /placeholder: Production SDK key
+              - text: Production SDK key
+          - button "Create SDK Key" [ref=e763]
+        - generic [ref=e765]:
+          - strong [ref=e766]: No SDK API keys yet
+          - generic [ref=e767]: Create a key above, copy it once, then inject it into your server or agent runtime environment.
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

@@ -1,0 +1,152 @@
+- generic [ref=e2]:
+  - generic [ref=e296]:
+    - complementary [ref=e297]:
+      - button "AgentShield" [ref=e298]:
+        - img [ref=e299]
+        - text: AgentShield
+      - navigation [ref=e303]:
+        - button "Dashboard" [ref=e304]:
+          - img [ref=e306]
+          - text: Dashboard
+        - button "Quick Start" [ref=e311]:
+          - img [ref=e313]
+          - text: Quick Start
+        - button "Agents" [ref=e315]:
+          - img [ref=e317]
+          - text: Agents
+        - button "Playground 🤖" [ref=e320]:
+          - img [ref=e322]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e326]:
+          - img [ref=e328]
+          - text: Ledger
+        - button "Attack Sim" [ref=e331]:
+          - img [ref=e333]
+          - text: Attack Sim
+        - button "Settings" [ref=e335]:
+          - img [ref=e337]
+          - text: Settings
+      - button "Sign out" [ref=e340]
+    - main [ref=e341]:
+      - generic [ref=e342]:
+        - heading "Security console" [level=1] [ref=e343]
+        - button "Run attack sim" [ref=e344]
+      - generic [ref=e345]:
+        - generic [ref=e346]:
+          - text: Ledger entries
+          - strong [ref=e347]: "14"
+        - generic [ref=e348]:
+          - text: Live protected events
+          - strong [ref=e349]: "2"
+        - generic [ref=e350]:
+          - text: Live threats
+          - strong [ref=e351]: "1"
+        - generic [ref=e352]:
+          - text: Ledger status
+          - strong [ref=e353]: ✓ Valid
+        - generic [ref=e354]:
+          - text: Live connected agents
+          - strong [ref=e355]: "1"
+      - generic [ref=e356]:
+        - generic [ref=e357]:
+          - generic [ref=e358]: "Workspace Status:"
+          - generic [ref=e359]: Live Shield Active
+        - generic [ref=e360]: AgentShield is actively shielding your external agent runtimes in real time.
+      - generic [ref=e361]:
+        - generic [ref=e362]:
+          - generic [ref=e363]: Security Telemetry & Live Threat Analytics
+          - generic [ref=e364]:
+            - generic [ref=e365]: "Total Events (Scale: 0 - 10)"
+            - generic [ref=e367]: "Threats Blocked (Scale: 0 - 5)"
+        - generic [ref=e369]:
+          - generic [ref=e370]:
+            - generic [ref=e371]: Events Screened (7h)
+            - generic [ref=e372]:
+              - generic [ref=e373]: "2"
+              - generic [ref=e374]: avg 0/h
+          - generic [ref=e375]:
+            - generic [ref=e376]: Threats Intercepted
+            - generic [ref=e378]:
+              - generic [ref=e379]: "1"
+              - generic [ref=e380]: 100% blocked
+          - generic [ref=e381]:
+            - generic [ref=e382]: Shield Integrity
+            - generic [ref=e384]:
+              - generic [ref=e385]: 100%
+              - generic [ref=e386]: Active shielding
+        - img [ref=e388]:
+          - generic [ref=e389]: "10"
+          - generic [ref=e390]: "5"
+          - generic [ref=e391]: "0"
+          - generic [ref=e392]: "5"
+          - generic [ref=e393]: "3"
+          - generic [ref=e394]: "0"
+          - generic [ref=e413]: "-7h"
+          - generic [ref=e414]: "-6h"
+          - generic [ref=e415]: "-5h"
+          - generic [ref=e416]: "-4h"
+          - generic [ref=e417]: "-3h"
+          - generic [ref=e418]: "-2h"
+          - generic [ref=e419]: "-1h"
+      - generic [ref=e427]:
+        - generic [ref=e428]:
+          - generic [ref=e429]: Event feed
+          - generic [ref=e430]:
+            - generic [ref=e431]: BLOCKED
+            - generic [ref=e432]: ResearchAgent
+            - generic [ref=e433]: message
+            - generic [ref=e434]: live runtime
+            - generic [ref=e435]: "#19"
+          - generic [ref=e436]:
+            - generic [ref=e437]: ALLOWED
+            - generic [ref=e438]: ResearchAgent
+            - generic [ref=e439]: message
+            - generic [ref=e440]: live runtime
+            - generic [ref=e441]: "#18"
+          - generic [ref=e442]:
+            - generic [ref=e443]: ALLOWED
+            - generic [ref=e444]: system
+            - generic [ref=e445]: message
+            - generic [ref=e446]: simulation
+            - generic [ref=e447]: "#17"
+          - generic [ref=e448]:
+            - generic [ref=e449]: ALLOWED
+            - generic [ref=e450]: system
+            - generic [ref=e451]: auth
+            - generic [ref=e452]: simulation
+            - generic [ref=e453]: "#16"
+          - generic [ref=e454]:
+            - generic [ref=e455]: BLOCKED
+            - generic [ref=e456]: system
+            - generic [ref=e457]: message
+            - generic [ref=e458]: simulation
+            - generic [ref=e459]: "#15"
+          - generic [ref=e460]:
+            - generic [ref=e461]: ALLOWED
+            - generic [ref=e462]: system
+            - generic [ref=e463]: auth
+            - generic [ref=e464]: simulation
+            - generic [ref=e465]: "#14"
+          - generic [ref=e466]:
+            - generic [ref=e467]: BLOCKED
+            - generic [ref=e468]: system
+            - generic [ref=e469]: tool_call
+            - generic [ref=e470]: simulation
+            - generic [ref=e471]: "#13"
+          - generic [ref=e472]:
+            - generic [ref=e473]: ALLOWED
+            - generic [ref=e474]: system
+            - generic [ref=e475]: auth
+            - generic [ref=e476]: simulation
+            - generic [ref=e477]: "#12"
+        - generic [ref=e478]:
+          - generic [ref=e479]: Threats
+          - generic [ref=e480]:
+            - generic [ref=e481]: instruction override
+            - generic [ref=e482]: ResearchAgent
+            - generic [ref=e483]: 97%
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

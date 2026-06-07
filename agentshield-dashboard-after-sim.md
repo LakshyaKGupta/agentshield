@@ -1,0 +1,151 @@
+- generic [ref=e2]:
+  - generic [ref=e1190]:
+    - complementary [ref=e1191]:
+      - button "AgentShield" [ref=e1192]:
+        - img [ref=e1193]
+        - text: AgentShield
+      - navigation [ref=e1197]:
+        - button "Dashboard" [ref=e1198]:
+          - img [ref=e1200]
+          - text: Dashboard
+        - button "Quick Start" [ref=e1205]:
+          - img [ref=e1207]
+          - text: Quick Start
+        - button "Agents" [ref=e1209]:
+          - img [ref=e1211]
+          - text: Agents
+        - button "Playground 🤖" [ref=e1214]:
+          - img [ref=e1216]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e1220]:
+          - img [ref=e1222]
+          - text: Ledger
+        - button "Attack Sim" [ref=e1225]:
+          - img [ref=e1227]
+          - text: Attack Sim
+        - button "Settings" [ref=e1229]:
+          - img [ref=e1231]
+          - text: Settings
+      - button "Sign out" [ref=e1234]
+    - main [ref=e1235]:
+      - generic [ref=e1236]:
+        - heading "Security console" [level=1] [ref=e1237]
+        - button "Run attack sim" [ref=e1238]
+      - generic [ref=e1239]:
+        - generic [ref=e1240]:
+          - text: Ledger entries
+          - strong [ref=e1241]: "12"
+        - generic [ref=e1242]:
+          - text: Live protected events
+          - strong [ref=e1243]: "0"
+        - generic [ref=e1244]:
+          - text: Live threats
+          - strong [ref=e1245]: "0"
+        - generic [ref=e1246]:
+          - text: Ledger status
+          - strong [ref=e1247]: ✓ Valid
+        - generic [ref=e1248]:
+          - text: Live connected agents
+          - strong [ref=e1249]: "0"
+      - generic [ref=e1250]:
+        - generic [ref=e1251]:
+          - generic [ref=e1252]: "Workspace Status:"
+          - generic [ref=e1253]: Awaiting First SDK Traffic
+        - generic [ref=e1254]: Monitoring is configured, but no external SDK traffic has connected yet. Live runtime metrics are zero.
+      - generic [ref=e1255]:
+        - generic [ref=e1256]:
+          - generic [ref=e1257]: Security Telemetry & Live Threat Analytics
+          - generic [ref=e1258]:
+            - generic [ref=e1259]: "Total Events (Scale: 0 - 10)"
+            - generic [ref=e1261]: "Threats Blocked (Scale: 0 - 5)"
+        - generic [ref=e1263]:
+          - generic [ref=e1264]:
+            - generic [ref=e1265]: Events Screened (7h)
+            - generic [ref=e1266]:
+              - generic [ref=e1267]: "0"
+              - generic [ref=e1268]: avg 0/h
+          - generic [ref=e1269]:
+            - generic [ref=e1270]: Threats Intercepted
+            - generic [ref=e1272]:
+              - generic [ref=e1273]: "0"
+              - generic [ref=e1274]: 100% blocked
+          - generic [ref=e1275]:
+            - generic [ref=e1276]: Shield Integrity
+            - generic [ref=e1278]:
+              - generic [ref=e1279]: 100%
+              - generic [ref=e1280]: Active shielding
+        - img [ref=e1282]:
+          - generic [ref=e1283]: "10"
+          - generic [ref=e1284]: "5"
+          - generic [ref=e1285]: "0"
+          - generic [ref=e1286]: "5"
+          - generic [ref=e1287]: "3"
+          - generic [ref=e1288]: "0"
+          - generic [ref=e1303]: "-7h"
+          - generic [ref=e1304]: "-6h"
+          - generic [ref=e1305]: "-5h"
+          - generic [ref=e1306]: "-4h"
+          - generic [ref=e1307]: "-3h"
+          - generic [ref=e1308]: "-2h"
+          - generic [ref=e1309]: "-1h"
+      - generic [ref=e1317]:
+        - generic [ref=e1318]:
+          - generic [ref=e1319]: Event feed
+          - generic [ref=e1320]:
+            - generic [ref=e1321]: ALLOWED
+            - generic [ref=e1322]: system
+            - generic [ref=e1323]: message
+            - generic [ref=e1324]: simulation
+            - generic [ref=e1325]: "#17"
+          - generic [ref=e1326]:
+            - generic [ref=e1327]: ALLOWED
+            - generic [ref=e1328]: system
+            - generic [ref=e1329]: auth
+            - generic [ref=e1330]: simulation
+            - generic [ref=e1331]: "#16"
+          - generic [ref=e1332]:
+            - generic [ref=e1333]: BLOCKED
+            - generic [ref=e1334]: system
+            - generic [ref=e1335]: message
+            - generic [ref=e1336]: simulation
+            - generic [ref=e1337]: "#15"
+          - generic [ref=e1338]:
+            - generic [ref=e1339]: ALLOWED
+            - generic [ref=e1340]: system
+            - generic [ref=e1341]: auth
+            - generic [ref=e1342]: simulation
+            - generic [ref=e1343]: "#14"
+          - generic [ref=e1344]:
+            - generic [ref=e1345]: BLOCKED
+            - generic [ref=e1346]: system
+            - generic [ref=e1347]: tool_call
+            - generic [ref=e1348]: simulation
+            - generic [ref=e1349]: "#13"
+          - generic [ref=e1350]:
+            - generic [ref=e1351]: ALLOWED
+            - generic [ref=e1352]: system
+            - generic [ref=e1353]: auth
+            - generic [ref=e1354]: simulation
+            - generic [ref=e1355]: "#12"
+          - generic [ref=e1356]:
+            - generic [ref=e1357]: BLOCKED
+            - generic [ref=e1358]: system
+            - generic [ref=e1359]: message
+            - generic [ref=e1360]: simulation
+            - generic [ref=e1361]: "#11"
+          - generic [ref=e1362]:
+            - generic [ref=e1363]: ALLOWED
+            - generic [ref=e1364]: system
+            - generic [ref=e1365]: auth
+            - generic [ref=e1366]: simulation
+            - generic [ref=e1367]: "#10"
+        - generic [ref=e1368]:
+          - generic [ref=e1369]: Threats
+          - generic [ref=e1370]:
+            - paragraph [ref=e1371]: No live runtime threats have been recorded. Internal simulations are excluded from this count.
+            - generic [ref=e1372]: Live Threat Count Clean
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]

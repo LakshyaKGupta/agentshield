@@ -1,0 +1,76 @@
+- generic [ref=e2]:
+  - generic [ref=e665]:
+    - complementary [ref=e666]:
+      - button "AgentShield" [ref=e667]:
+        - img [ref=e668]
+        - text: AgentShield
+      - navigation [ref=e672]:
+        - button "Dashboard" [ref=e673]:
+          - img [ref=e675]
+          - text: Dashboard
+        - button "Quick Start" [ref=e680]:
+          - img [ref=e682]
+          - text: Quick Start
+        - button "Agents" [ref=e684]:
+          - img [ref=e686]
+          - text: Agents
+        - button "Playground 🤖" [ref=e689]:
+          - img [ref=e691]
+          - text: Playground 🤖
+        - button "Ledger" [ref=e695]:
+          - img [ref=e697]
+          - text: Ledger
+        - button "Attack Sim" [ref=e700]:
+          - img [ref=e702]
+          - text: Attack Sim
+        - button "Settings" [ref=e704]:
+          - img [ref=e706]
+          - text: Settings
+      - button "Sign out" [ref=e709]
+    - main [ref=e710]:
+      - heading "Settings & Personalization" [level=1] [ref=e712]
+      - generic [ref=e713]:
+        - button "General" [ref=e714]
+        - button "Personalization" [ref=e715]
+        - button "SDK API Keys" [ref=e716]
+        - button "Cryptographic Vault" [ref=e717]
+        - button "Webhook Alerts" [ref=e718]
+        - button "Team Directory" [ref=e719]
+      - generic [ref=e753]:
+        - generic [ref=e754]:
+          - generic [ref=e755]:
+            - generic [ref=e756]: SDK API Keys
+            - paragraph [ref=e757]: Create one-time visible API keys for SDKs, agents, CI jobs, and server-side integrations. Keys are hashed at rest and the full secret is shown only once.
+          - button "Refresh" [ref=e758]
+        - generic [ref=e759]:
+          - generic [ref=e760]:
+            - generic [ref=e761]: Key name
+            - textbox "Key name" [ref=e762]:
+              - /placeholder: Production SDK key
+              - text: Production SDK key
+          - button "Create SDK Key" [active] [ref=e763]
+        - generic [ref=e768]:
+          - generic [ref=e769]:
+            - strong [ref=e770]: Copy this key now. It will not be shown again.
+            - paragraph [ref=e771]:
+              - text: Store it in your deployment secret manager as
+              - code [ref=e772]: AGENTSHIELD_API_KEY
+              - text: .
+          - generic [ref=e773]:
+            - code [ref=e774]: as_live_88nbXh3F••••••••••••••••••••••••••••••••••••
+            - button "Copy" [ref=e775]
+        - generic [ref=e776]:
+          - generic [ref=e777]:
+            - strong [ref=e778]: Production SDK key
+            - generic [ref=e779]:
+              - code [ref=e780]: as_live_88nbXh3F••••••••
+              - text: · agents:write, shield:write, ledger:read, threats:read
+            - generic [ref=e781]: Created 6/2/2026, 8:42:35 PM · Last used never
+          - generic [ref=e782]:
+            - generic [ref=e783]: active
+            - button "Revoke" [ref=e784]
+  - complementary "AgentShield assistant":
+    - generic [ref=e291]:
+      - textbox "Ask me anything…" [ref=e292]
+      - button "Send" [ref=e293]:
+        - img [ref=e294]
