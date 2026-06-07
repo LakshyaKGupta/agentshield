@@ -74,6 +74,25 @@
 
 ---
 
+## Session Update - 2026-06-07 (Setup Progress Source-of-Truth Fix)
+
+### Objective
+- Fix fresh accounts showing setup progress as `40% complete` before any SDK key or external runtime connection exists.
+
+### Root Cause
+- `list_agents(...).active_sdk_key_exists` counted any active API key with `shield:write`.
+- Browser session keys also have `shield:write`, so a newly signed-up workspace was incorrectly treated as already having an SDK key.
+
+### Completed
+- Updated SDK-key detection to require `key_type = 'sdk'` in Postgres and in-memory stores.
+- Added regression coverage: workspace/session keys no longer satisfy `active_sdk_key_exists`; creating an actual SDK key does.
+
+### Verification
+- `npm run build` passed.
+- `python3 -m unittest discover -s tests -v` passed: 44 tests, 3 expected Postgres integration skips because no disposable local `AGENTSHIELD_TEST_DATABASE_URL` is configured.
+
+---
+
 ## Session Update - 2026-06-06 (Google Sign-In Configuration)
 
 ### Objective

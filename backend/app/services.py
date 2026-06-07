@@ -580,7 +580,7 @@ def list_agents(store: InMemoryStore, settings: Settings, tenant_id, private_key
     if hasattr(store, "_connect") and store.backend_name == "postgres":
         with store._connect() as conn:
             res = conn.execute(
-                "SELECT COUNT(*) AS cnt FROM api_keys WHERE tenant_id = %s AND status = 'active' AND scopes @> '[\"shield:write\"]'::jsonb",
+                "SELECT COUNT(*) AS cnt FROM api_keys WHERE tenant_id = %s AND status = 'active' AND key_type = 'sdk' AND scopes @> '[\"shield:write\"]'::jsonb",
                 (tenant_id,)
             )
             row = res.fetchone()
@@ -589,6 +589,7 @@ def list_agents(store: InMemoryStore, settings: Settings, tenant_id, private_key
         active_sdk_key_exists = any(
             k.tenant_id == tenant_id 
             and k.status == "active" 
+            and getattr(k, "key_type", "session") == "sdk"
             and "shield:write" in k.scopes 
             for k in store.api_keys.values()
         )

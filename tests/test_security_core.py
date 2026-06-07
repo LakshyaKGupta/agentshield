@@ -222,6 +222,21 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertEqual(revoked.status, "revoked")
         self.assertEqual(revoked.token, "")
 
+    def test_agent_list_excludes_session_keys_from_sdk_status(self) -> None:
+        agents_before_sdk = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
+        self.assertFalse(agents_before_sdk.active_sdk_key_exists)
+
+        create_api_key(
+            self.store,
+            self.settings,
+            self.tenant.id,
+            ["agents:write", "shield:write"],
+            name="Runtime SDK key",
+            key_type="sdk",
+        )
+        agents_after_sdk = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
+        self.assertTrue(agents_after_sdk.active_sdk_key_exists)
+
     def test_workspace_signup_and_login_issue_api_keys(self) -> None:
         signup = signup_workspace(
             self.store,
