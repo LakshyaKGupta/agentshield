@@ -1,3 +1,4 @@
+<!-- Archived legacy security audits -->
 # AgentShield — Complete Technical Audit & Reality Due-Diligence Review
 
 **Prepared by:** Senior Staff Engineer, Security Architect, Product Auditor & QA Lead  
