@@ -57,6 +57,23 @@
 
 ---
 
+## Session Update - 2026-06-07 (Firebase Backend 500 Fix)
+
+### Objective
+- Fix production `Internal Server Error` during Google Sign-In backend exchange.
+
+### Root Cause
+- `/api/v1/auth/firebase-verify` used `import jwt` in `backend/app/security/firebase_auth.py`.
+- Local environment had PyJWT installed, but Vercel installs from `requirements.txt`, which did not include `PyJWT`.
+- Production traceback: `ModuleNotFoundError: No module named 'jwt'`.
+
+### Completed
+- Added `PyJWT>=2.8` to `requirements.txt`.
+- Added regression coverage to ensure the Firebase runtime dependency is declared.
+- Verified focused tests and frontend build locally.
+
+---
+
 ## Session Update - 2026-06-06 (Google Sign-In Configuration)
 
 ### Objective

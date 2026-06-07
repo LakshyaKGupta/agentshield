@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from backend.app.contracts import AgentCreateRequest, AnalyzeRequest, PermissionManifest, ToolCallRequest, Verdict
 from backend.app.ledger.service import verify_ledger
@@ -378,6 +379,10 @@ class SecurityCoreTests(unittest.TestCase):
             with self.assertRaises(ValueError) as ctx:
                 verify_firebase_id_token("forged.firebase.jwt.claims")
             self.assertIn("Firebase Auth is disabled in Demo/Development Mode", str(ctx.exception))
+
+    def test_firebase_auth_runtime_dependency_declared(self) -> None:
+        requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text()
+        self.assertIn("PyJWT", requirements)
 
     def test_cross_tenant_token_verification_rejected(self) -> None:
         import jwt
