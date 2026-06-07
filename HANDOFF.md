@@ -1,5 +1,27 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-06-07 (Repository Clean Up & README Enhancement)
+
+### Objective
+- Clean up the repository layout by moving unnecessary files (legacy snapshots, audit documents, screenshots, and documentation packages) to a structured `archive/` folder.
+- Enhance the primary project `README.md` to highlight the live production website link and document the new directory layout.
+
+### Actions Taken
+1. **Created Archive Folders**:
+   - `archive/screenshots` for UI/UX design snapshots and console screenshots.
+   - `archive/audits` for legacy markdown audit reports.
+   - `archive/documentation_pack` for PDF/source master plan documents.
+2. **Re-organized Files**:
+   - Moved 37 `.codex-*.png` files and 12 `agentshield-*.png` files into `archive/screenshots/`.
+   - Moved 18 `agentshield-*.md` files and audit documents into `archive/audits/`.
+   - Moved `AgentShield_Production_Documentation_Pack` into `archive/documentation_pack/`.
+   - Moved `build_agentshield_docs.py` to `scripts/build_agentshield_docs.py`.
+3. **Updated README**:
+   - Added a direct link to the live production site: `https://agentshield-sigma.vercel.app`.
+   - Arranged sections for key features, local setup, E2E/unit testing, and directory layout mapping.
+
+---
+
 ## Session Update - 2026-06-07 (AgentShield Production Auth & Onboarding Fixes)
 
 ### Objective
