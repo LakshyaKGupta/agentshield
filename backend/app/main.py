@@ -2641,3 +2641,79 @@ if FRONTEND_DIST.exists():
         if full_path.startswith(("api/", "v1/", "ws/", "health", "ready", "docs", "openapi.json")):
             raise HTTPException(status_code=404, detail={"code": "NOT_FOUND"})
         return FastAPIResponse(status_code=200)
+
+
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="AgentShield API",
+        version=settings.app_version,
+        routes=app.routes,
+    )
+    # Define security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "X-AgentShield-API-Key": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-AgentShield-API-Key",
+            "description": "Workspace or SDK API Key (e.g., as_live_xxx)"
+        },
+        "x-api-key": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key",
+            "description": "Workspace or SDK API Key (alternative lowercase header)"
+        },
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "as_live_xxx or JWT",
+            "description": "Bearer token authentication (Authorization: Bearer as_live_xxx or JWT)"
+        }
+    }
+    
+    security_requirements = [
+        {"X-AgentShield-API-Key": []},
+        {"x-api-key": []},
+        {"BearerAuth": []}
+    ]
+    
+    # Check if a route requires require_api_key in its dependency tree
+    def requires_auth(route_dependant) -> bool:
+        if not route_dependant:
+            return False
+        queue = [route_dependant]
+        visited = set()
+        while queue:
+            dep = queue.pop(0)
+            if not dep:
+                continue
+            dep_id = id(dep)
+            if dep_id in visited:
+                continue
+            visited.add(dep_id)
+            if dep.call == require_api_key:
+                return True
+            for sub_dep in dep.dependencies:
+                queue.append(sub_dep)
+        return False
+
+    for route in app.routes:
+        if isinstance(route, APIRoute) and requires_auth(route.dependant):
+            path = route.path_format
+            if path in openapi_schema.get("paths", {}):
+                path_item = openapi_schema["paths"][path]
+                for method in route.methods:
+                    method_lower = method.lower()
+                    if method_lower in path_item:
+                        path_item[method_lower]["security"] = security_requirements
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+

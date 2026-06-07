@@ -71,6 +71,40 @@ class ProductionReadinessTests(unittest.TestCase):
         )
         self.assertFalse([finding for finding in findings if finding.level == "error"])
 
+    def test_openapi_schema_contains_security_schemes_and_requirements(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+
+        client = TestClient(app)
+        response = client.get("/openapi.json")
+        self.assertEqual(response.status_code, 200)
+        
+        schema = response.json()
+        
+        # Verify security schemes exist
+        security_schemes = schema.get("components", {}).get("securitySchemes", {})
+        self.assertIn("X-AgentShield-API-Key", security_schemes)
+        self.assertIn("x-api-key", security_schemes)
+        self.assertIn("BearerAuth", security_schemes)
+        
+        # Verify specific authenticated endpoint has security requirements attached
+        paths = schema.get("paths", {})
+        self.assertIn("/v1/auth/me", paths)
+        auth_me_path = paths["/v1/auth/me"]
+        self.assertIn("get", auth_me_path)
+        
+        security_reqs = auth_me_path["get"].get("security", [])
+        self.assertEqual(len(security_reqs), 3)
+        self.assertIn({"X-AgentShield-API-Key": []}, security_reqs)
+        self.assertIn({"x-api-key": []}, security_reqs)
+        self.assertIn({"BearerAuth": []}, security_reqs)
+        
+        # Verify unauthenticated endpoint (e.g. /ready) does NOT have security requirements
+        self.assertIn("/ready", paths)
+        ready_path = paths["/ready"]
+        self.assertIn("get", ready_path)
+        self.assertNotIn("security", ready_path["get"])
+
 
 if __name__ == "__main__":
     unittest.main()
