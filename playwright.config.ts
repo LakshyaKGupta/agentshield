@@ -1,4 +1,4 @@
-# AgentShield container and runner system configuration properties
+// AgentShield container and runner system configuration properties
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
