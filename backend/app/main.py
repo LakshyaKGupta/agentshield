@@ -235,17 +235,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return error_response(422, "VALIDATION_ERROR", "Request validation failed.", exc.errors())
 
 
-def require_api_key(
-    request: Request,
-    x_agentshield_api_key: str | None = Header(default=None, alias="X-AgentShield-API-Key"),
-):
+def require_api_key(request: Request):
     """
     Accepts authentication from either:
-    1. X-AgentShield-API-Key header (direct SDK / cURL usage).
-    2. httpOnly ``session`` cookie set by /v1/auth/session (browser usage).
+    1. X-AgentShield-API-Key header (case-insensitive).
+    2. x-api-key header (case-insensitive).
+    3. Authorization header (case-insensitive, Bearer as_live_xxx).
+    4. httpOnly ``session`` cookie set by /v1/auth/session (browser usage).
        When using the cookie path, CSRF token is also validated.
     """
-    raw_key = x_agentshield_api_key
+    raw_key = request.headers.get("x-agentshield-api-key")
+    if not raw_key:
+        raw_key = request.headers.get("x-api-key")
+    if not raw_key:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token_val = auth_header[7:].strip()
+            if token_val.startswith("as_live_"):
+                raw_key = token_val
+
     if not raw_key:
         # Attempt cookie-based session
         raw_key = get_api_key_from_session(request)  # raises 403 on CSRF fail
@@ -262,6 +270,7 @@ def require_api_key(
         return authenticate_api_key(store, settings, raw_key, "shield:write")
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
+
 
 
 def _create_browser_session(response: FastAPIResponse, request: Request, raw_key: str) -> str:
@@ -646,7 +655,18 @@ def analyze(
     api_key=Depends(require_api_key)
 ):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
+    if token and token.startswith("as_live_"):
+        token = None
     request_id = getattr(http_request.state, "request_id", None)
+    
+    agent = store.agents.get(request.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail={"code": "AGENT_NOT_FOUND", "message": "Agent not found."})
+    if agent.tenant_id != api_key.tenant_id:
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "Access denied."})
+    if agent.status != "active":
+        raise HTTPException(status_code=401, detail={"code": "AUTH_AGENT_TOKEN_REVOKED", "message": "Agent has been revoked."})
+
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
         verdict = analyze_message(
@@ -658,8 +678,8 @@ def analyze(
             event_source=_runtime_event_source(api_key),
             affects_score=getattr(api_key, "key_type", "session") == "sdk",
             request_id=request_id,
+            bypass_token_validation=True,
         )
-        agent = store.agents.get(request.agent_id)
         if agent is not None and verdict.ledger_id:
             _mark_agent_live_if_sdk(api_key, agent)
         if getattr(api_key, "key_type", "session") == "sdk" and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
@@ -699,7 +719,18 @@ def tool_call(
     api_key=Depends(require_api_key)
 ):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
+    if token and token.startswith("as_live_"):
+        token = None
     request_id = getattr(http_request.state, "request_id", None)
+    
+    agent = store.agents.get(request.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail={"code": "AGENT_NOT_FOUND", "message": "Agent not found."})
+    if agent.tenant_id != api_key.tenant_id:
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "Access denied."})
+    if agent.status != "active":
+        raise HTTPException(status_code=401, detail={"code": "AUTH_AGENT_TOKEN_REVOKED", "message": "Agent has been revoked."})
+
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
         verdict = check_tool_call(
@@ -711,8 +742,8 @@ def tool_call(
             event_source=_runtime_event_source(api_key),
             affects_score=getattr(api_key, "key_type", "session") == "sdk",
             request_id=request_id,
+            bypass_token_validation=True,
         )
-        agent = store.agents.get(request.agent_id)
         if agent is not None and verdict.ledger_id:
             _mark_agent_live_if_sdk(api_key, agent)
         if getattr(api_key, "key_type", "session") == "sdk" and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
@@ -741,6 +772,7 @@ def tool_call(
         return verdict
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
+
 
 
 @app.get("/v1/ledger")

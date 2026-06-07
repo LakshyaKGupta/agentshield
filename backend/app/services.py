@@ -635,9 +635,18 @@ def analyze_message(
     event_source: str = "live_runtime",
     affects_score: bool = True,
     request_id: str | None = None,
+    bypass_token_validation: bool = False,
 ) -> SecurityVerdict:
     started = perf_counter()
-    verify_agent_token(store, settings, token, public_key_pem, request.agent_id)
+    if not bypass_token_validation:
+        verify_agent_token(store, settings, token, public_key_pem, request.agent_id)
+    else:
+        # Assert agent exists and is active
+        agent = store.agents.get(request.agent_id)
+        if not agent:
+            raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
+        if agent.status != "active":
+            raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
     agent = store.agents[request.agent_id]
     detection = detect_injection(request.message)
     
@@ -728,9 +737,18 @@ def check_tool_call(
     event_source: str = "live_runtime",
     affects_score: bool = True,
     request_id: str | None = None,
+    bypass_token_validation: bool = False,
 ) -> SecurityVerdict:
     started = perf_counter()
-    verify_agent_token(store, settings, token, public_key_pem, request.agent_id)
+    if not bypass_token_validation:
+        verify_agent_token(store, settings, token, public_key_pem, request.agent_id)
+    else:
+        # Assert agent exists and is active
+        agent = store.agents.get(request.agent_id)
+        if not agent:
+            raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
+        if agent.status != "active":
+            raise PermissionError("AUTH_AGENT_TOKEN_REVOKED")
     agent = store.agents[request.agent_id]
     allowed, evidence = check_tool_permission(agent.permissions, request.tool_name, request.action)
     evidence_list = [] if evidence is None else [evidence]

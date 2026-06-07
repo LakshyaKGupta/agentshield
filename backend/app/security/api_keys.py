@@ -65,10 +65,15 @@ def authenticate_api_key(store: InMemoryStore, settings: Settings, raw_key: str 
         raise PermissionError("AUTH_API_KEY_MISSING")
     token_hash = hash_api_key(raw_key, settings.api_key_pepper)
     record = store.api_keys.get(token_hash)
-    if not record or record.status != "active":
+    if not record:
+        raise PermissionError("AUTH_API_KEY_INVALID")
+    if record.status == "revoked":
+        raise PermissionError("AUTH_API_KEY_REVOKED")
+    if record.status != "active":
         raise PermissionError("AUTH_API_KEY_INVALID")
     if required_scope not in record.scopes:
         raise PermissionError("AUTH_API_KEY_INVALID")
     record.last_used_at = datetime.now(timezone.utc)
     store.persist_api_key(record)
     return record
+

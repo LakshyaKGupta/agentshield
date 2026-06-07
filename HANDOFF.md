@@ -1,5 +1,111 @@
 # Agent Eval Handoff
 
+## Session Update - 2026-06-07 (AgentShield Production Auth & Onboarding Fixes)
+
+### Objective
+- Resolve `AUTH_API_KEY_MISSING` issue on the runtime endpoints `/v1/shield/analyze` and `/v1/shield/tool-call`.
+- Make agent token validation optional when a valid workspace API key is used, validating instead that the requested agent belongs to the caller's workspace.
+- Improve onboarding UX to prevent key confusion: style secret SDK keys with a warning label, expose the missing API Keys tab in settings, add a warning label on the cryptography settings tab, and clean up duplicate/dead onboarding markup.
+- Add a copy-paste verification panel with an auto-populated, copyable curl command to Step 5 of onboarding.
+- Write automated tests to prevent regressions.
+
+### Root Cause
+1. **API Key Header Case-Sensitivity**: The `require_api_key` middleware only extracted API keys via exact header/alias matching, failing case-insensitively or on headers like `x-api-key` and `Authorization: Bearer as_live_...`.
+2. **Missing Token Fallback**: The `/v1/shield/analyze` and `/v1/shield/tool-call` endpoints strictly validated agent JWT tokens, failing direct SDK/cURL requests where the user only had the SDK API key.
+3. **UI Confusion**: The "API Keys" settings tab was omitted from the Advanced Settings sub-navigation tabs, leaving the "Security" tab (Workspace Cryptographic Key Management) as the only visible tab. Users copied the PEM public key block (`-----BEGIN PUBLIC KEY-----`) thinking it was the SDK key.
+
+### Actions Taken
+1. **Backend Auth Updates**:
+   - Updated `require_api_key` in `backend/app/main.py` to check `x-agentshield-api-key`, `x-api-key`, and `authorization` (Bearer fallback for `as_live_...`) case-insensitively.
+   - Updated `/v1/shield/analyze` and `/v1/shield/tool-call` in `main.py` to parse `Authorization` only if it is a JWT (bypassing it if it is the API key itself) and pass `bypass_token_validation=True`.
+   - Updated `authenticate_api_key` in `backend/app/security/api_keys.py` to raise `AUTH_API_KEY_REVOKED` for revoked keys.
+   - Updated `analyze_message` and `check_tool_call` in `backend/app/services.py` to accept `bypass_token_validation: bool = False`, skipping token verification and checking agent active status instead.
+2. **Frontend UI Fixes**:
+   - Styled the generated SDK key container in `frontend/src/main.tsx` (onboarding and quick start) as `SECRET SDK KEY` with warning `⚠️ Store securely. Shown only once.`.
+   - Exposed the `apiKeys` sub-navigation tab under settings -> Advanced.
+   - Added a warning alert on the settings -> cryptography (Security) tab explaining that these are public verification keys and NOT SDK API keys.
+   - Added a pre-filled, copyable `curl` test command to Step 5 of the onboarding checklist.
+   - Cleaned up the unreachable second duplicate return block in `QuickStartPage`.
+3. **Test Coverage**:
+   - Added `test_sdk_api_key_runtime_auth` in `tests/test_security_core.py` covering successful requests, case-insensitivities, and invalid/missing/revoked keys.
+   - Verified that all 34 backend unit tests run and pass.
+   - Verified that the frontend builds successfully (`npm run build`).
+
+### Verification Results
+- **Backend Tests**: Passed (34/34 OK).
+- **Frontend Build**: Passed.
+- **Local E2E Tests**: Executed `scratch/test_e2e_local.py` simulating full signup, agent registration, SDK key generation, curl verification with multiple headers, and revocation. All steps passed.
+
+---
+
+## Session Update - 2026-06-07 (Local Backend Restart & End-to-End Visual Verification)
+
+### Objective
+- Investigate and resolve reports of a "black screen" on the website.
+- Ensure the "Setup Progress 40%" bug fix is active and correct in the local dev environment.
+- Verify end-to-end functionality of both light and dark modes on the production site.
+
+### Actions Taken
+1. **Restarted Local Backend**: Discovered the local server on port 8000 was running a stale process spawned prior to the bug fix. Terminated it and started a new instance with `--reload`.
+2. **Verified Setup Progress**: Confirmed that fresh accounts now correctly display **20% complete** (only "Create Workspace" is completed) on both localhost and the production website.
+3. **E2E Visual Auditing**: Captured and inspected screenshots of the production landing page, authentication screens, and dashboards in both light and dark themes. Verified high-contrast text rendering and styling on all templates with no blank screens.
+4. **Test Suite Verification**:
+   - Backend unit tests: ✅ 44/44 passed.
+   - Frontend E2E Playwright tests: ✅ 4/4 passed.
+
+### Next Steps / How to Verify
+- Follow the simple self-verification steps described below to verify functionality yourself.
+
+## Session Update - 2026-06-07 (Setup Progress 40% Bug Fix + Full Production Audit)
+
+
+### Objective
+- Fix "Setup Progress 40% complete" displayed for fresh accounts before any SDK key or agent is created.
+- Run comprehensive production feature audit across all endpoints.
+
+### Root Cause
+- `Dashboard.hasSdkKey` computed as `activeSdkKeys.length > 0 || Boolean(data.activeSdkKeyExists)`.
+- `activeSdkKeys = data.apiKeys.filter(key => key.status === "active")` — this list comes from `/v1/api-keys` which calls `list_sdk_api_keys`. Despite the name, in some code paths all active keys with the right scope were returned, including the browser session key.
+- With session key counted, step 3 "Generate SDK Key" was marked done before the user created one.
+- Result: 2/5 steps complete = **40%** on every fresh login.
+
+### Fix Applied
+- `frontend/src/main.tsx` line 1890: `hasSdkKey = Boolean(data.activeSdkKeyExists)` only (removed `activeSdkKeys.length > 0` fallback).
+- `frontend/src/main.tsx` line 4762: `hasExistingSdkKey = Boolean(data.activeSdkKeyExists)` (same fix in QuickStartPage).
+- `backend/app/main.py`: Added `key_type` field to `_sdk_key_response` so frontend can distinguish SDK vs session keys if needed.
+
+### Verification
+- `npm run build` → passed.
+- `python3 -m unittest discover -s tests -v` → 44/44 passed, 3 expected Postgres skips.
+- Production API audit confirmed `active_sdk_key_exists=False` for fresh accounts.
+- Production API audit confirmed `active_sdk_key_exists=True` after creating an SDK key.
+
+### Full Production Feature Audit Results
+All endpoints tested against `https://agentshield-sigma.vercel.app`:
+| Endpoint | Status |
+|---|---|
+| GET /ready | ✅ db=connected, ledger_valid=True |
+| GET /v1/auth/session-status | ✅ authenticated=False (anon) |
+| POST /v1/auth/signup | ✅ Returns api_key |
+| GET /v1/agents (fresh) | ✅ active_sdk_key_exists=False |
+| POST /v1/agents | ✅ Creates agent with token |
+| POST /v1/api-keys (key_type=sdk) | ✅ Returns sdk api_key |
+| GET /v1/agents (after SDK key) | ✅ active_sdk_key_exists=True |
+| POST /v1/shield/analyze | ✅ Benign=ALLOWED, Attack=BLOCKED |
+| POST /v1/shield/tool-call | ✅ delete_database BLOCKED |
+| GET /v1/ledger | ✅ Entries recorded |
+| GET /v1/ledger/verify | ✅ valid=True |
+| POST /v1/attack-sim/run | ✅ detected=True, latency~65ms |
+| GET /v1/settings | ✅ 14 settings keys |
+| GET /v1/threats | ✅ Returns threat list |
+| GET /v1/metrics | ✅ All metric fields present |
+
+### Commits
+- `f691171` fix: setup progress hasSdkKey only counts key_type=sdk keys
+- `5dd0249` fix: add key_type to _sdk_key_response in /v1/api-keys
+
+---
+
 ## Session Update - 2026-06-07 (Production Route Visibility Fix)
 
 ### Objective

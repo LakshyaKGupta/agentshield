@@ -734,6 +734,79 @@ class SecurityCoreTests(unittest.TestCase):
             self.assertNotEqual(ciphertext, "secret")
             self.assertEqual(encryptor.decrypt(ciphertext), "secret")
 
+    def test_sdk_api_key_runtime_auth(self) -> None:
+        """Verify that SDK API keys authorize runtime requests with no agent token, support case-insensitivity, and handle missing/invalid/revoked keys."""
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+        from unittest.mock import patch
+        
+        client = TestClient(app)
+        
+        with patch("backend.app.main.store", self.store):
+            # Create a fresh SDK API key
+            sdk_key = create_api_key(
+                self.store,
+                self.settings,
+                self.tenant.id,
+                ["agents:write", "shield:write", "ledger:read", "threats:read"],
+                name="Runtime Key",
+                key_type="sdk"
+            )
+            
+            payload = {
+                "agent_id": str(self.agent.agent_id),
+                "direction": "inbound",
+                "message": "Hello from manual SDK verification."
+            }
+            
+            # 1. Valid request using X-AgentShield-API-Key (original casing)
+            headers_1 = {
+                "X-AgentShield-API-Key": sdk_key
+            }
+            resp_1 = client.post("/v1/shield/analyze", headers=headers_1, json=payload)
+            self.assertEqual(resp_1.status_code, 200)
+            self.assertTrue(resp_1.json()["allowed"])
+            
+            # 2. Valid request using x-api-key (case-insensitive lowercase)
+            headers_2 = {
+                "x-api-key": sdk_key
+            }
+            resp_2 = client.post("/v1/shield/analyze", headers=headers_2, json=payload)
+            self.assertEqual(resp_2.status_code, 200)
+            self.assertTrue(resp_2.json()["allowed"])
+            
+            # 3. Valid request using Authorization: Bearer as_live_xxx
+            headers_3 = {
+                "Authorization": f"Bearer {sdk_key}"
+            }
+            resp_3 = client.post("/v1/shield/analyze", headers=headers_3, json=payload)
+            self.assertEqual(resp_3.status_code, 200)
+            self.assertTrue(resp_3.json()["allowed"])
+            
+            # 4. Invalid key -> expects AUTH_API_KEY_INVALID (401)
+            headers_invalid = {
+                "X-AgentShield-API-Key": "as_live_invalid_key_value"
+            }
+            resp_invalid = client.post("/v1/shield/analyze", headers=headers_invalid, json=payload)
+            self.assertEqual(resp_invalid.status_code, 401)
+            self.assertEqual(resp_invalid.json()["error"]["code"], "AUTH_API_KEY_INVALID")
+            
+            # 5. Missing key -> expects AUTH_API_KEY_MISSING (401)
+            resp_missing = client.post("/v1/shield/analyze", json=payload)
+            self.assertEqual(resp_missing.status_code, 401)
+            self.assertEqual(resp_missing.json()["error"]["code"], "AUTH_API_KEY_MISSING")
+            
+            # 6. Revoked key -> expects AUTH_API_KEY_REVOKED (401)
+            # Find the SDK key in store to revoke it
+            sdk_keys = list_sdk_api_keys(self.store, self.tenant.id)
+            sdk_key_record = next(k for k in sdk_keys if k.key_prefix == sdk_key[:16])
+            revoke_api_key(self.store, self.tenant.id, sdk_key_record.id)
+            
+            resp_revoked = client.post("/v1/shield/analyze", headers=headers_1, json=payload)
+            self.assertEqual(resp_revoked.status_code, 401)
+            self.assertEqual(resp_revoked.json()["error"]["code"], "AUTH_API_KEY_REVOKED")
+
+
 
 if __name__ == "__main__":
     unittest.main()
