@@ -1,3 +1,4 @@
+# AgentShield developer guidelines and IDE system configurations
 # JetBrains Agent Guidelines
 
 Follow `/Users/lol/Docs/instructions.ai/AGENTS.md`.
