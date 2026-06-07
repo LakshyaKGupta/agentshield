@@ -6796,6 +6796,7 @@ function AppRouter() {
   const navigate = useNavigate();
   const location = useLocation();
   const _setView = (v: string) => navigate(VIEW_ROUTES[v] ?? "/");
+  const postAuthPath = (location.state as any)?.from?.pathname ?? "/dashboard";
   const _logout = async () => {
     try { await requestJson("/v1/auth/logout", apiKey || SESSION_AUTH, { method: "POST" }); } catch { /* ignore */ }
     setApiKey("");
@@ -6857,8 +6858,8 @@ function AppRouter() {
         <Route path="/how-it-works" element={<HowItWorksPage setView={_setView} onLogout={_logout} authenticated={authenticated}/>} />
 
         {/* Auth — redirect to dashboard if already logged in */}
-        <Route path="/signin"         element={authenticated ? <Navigate to="/dashboard" replace /> : <AuthPage mode="login"  setView={_setView} onAuth={() => { setApiKey(SESSION_AUTH); navigate((location.state as any)?.from?.pathname ?? "/dashboard", { replace: true }); }}/>} />
-        <Route path="/signup"         element={authenticated ? <Navigate to="/dashboard" replace /> : <AuthPage mode="signup" setView={_setView} onAuth={() => { setApiKey(SESSION_AUTH); navigate((location.state as any)?.from?.pathname ?? "/dashboard", { replace: true }); }}/>} />
+        <Route path="/signin"         element={authenticated ? <Navigate to={postAuthPath} replace /> : <AuthPage mode="login"  setView={_setView} onAuth={() => { setApiKey(SESSION_AUTH); navigate(postAuthPath, { replace: true }); }}/>} />
+        <Route path="/signup"         element={authenticated ? <Navigate to={postAuthPath} replace /> : <AuthPage mode="signup" setView={_setView} onAuth={() => { setApiKey(SESSION_AUTH); navigate(postAuthPath, { replace: true }); }}/>} />
         <Route path="/forgot-password" element={authenticated ? <Navigate to="/dashboard" replace /> : <AuthPage mode="login" setView={_setView} onAuth={() => { setApiKey(SESSION_AUTH); navigate("/dashboard", { replace: true }); }}/>} />
 
         {/* Protected */}

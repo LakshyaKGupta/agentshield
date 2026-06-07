@@ -19,6 +19,7 @@
 - Fixed post-login deep-link preservation:
   - Removed `setView("app")` calls from `AuthPage` after successful email, Google, and dev-login flows.
   - `AppRouter` now remains the single source of truth for post-login navigation and can preserve the originally requested route.
+  - Auth routes use the same preserved `from` path even in the already-authenticated redirect branch, avoiding a late `/dashboard` redirect race after login.
 - Added quiet session detection:
   - New `GET /v1/auth/session-status` returns `{ authenticated, csrf_ready }` with HTTP 200 even when signed out.
   - Frontend session restoration uses this endpoint instead of creating noisy unauthenticated `/auth/me` 401s on public pages.
