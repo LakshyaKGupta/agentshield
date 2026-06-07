@@ -1,3 +1,4 @@
+# Serverless API routing entrypoint
 """Vercel FastAPI entrypoint.
 
 Vercel routes `/api/*` requests to this function. The local AgentShield backend
