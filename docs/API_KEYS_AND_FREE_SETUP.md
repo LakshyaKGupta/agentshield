@@ -1,3 +1,4 @@
+<!-- Operational documentation for workspace setup -->
 # AgentShield API Keys And Free Setup
 
 This project should run locally without paid services. External provider keys are optional unless you enable the related feature.
