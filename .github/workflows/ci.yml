@@ -1,3 +1,4 @@
+# GitHub Actions CI workflow for AgentShield
 name: AgentShield CI
 
 on:
