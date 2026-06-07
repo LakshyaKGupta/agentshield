@@ -1,3 +1,4 @@
+<!-- AgentShield primary documentation homepage -->
 # 🛡️ AgentShield
 
 AgentShield is a production-ready, high-performance runtime security middleware and monitoring console for autonomous AI agents. It provides deterministic prompt-injection screening, cryptographic agent identity validation via RS256 JWTs, deny-by-default permission manifests, an append-only tamper-evident ledger, secure webhook alert dispatching, multi-tenant RBAC team directories, and interactive behavioral risk profiling.
