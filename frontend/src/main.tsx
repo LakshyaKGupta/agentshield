@@ -1,3 +1,4 @@
+// Vite React application entrypoint
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import {
