@@ -1,3 +1,4 @@
+# LangChain agent security integration examples
 """
 AgentShield + LangChain Protected Agent Example
 ================================================
