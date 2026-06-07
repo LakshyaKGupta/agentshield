@@ -4147,9 +4147,10 @@ Complete the remaining hardening items: Redis, KMS/HSM, SSO/SCIM, SIEM export, a
 - Strict provider-key scan found no Groq/Tavily/OpenAI/GitHub-style literal keys in the working tree.
 
 ### External Configuration Still Required
-- Redis is implemented and readiness-visible, but production Vercel currently has no `REDIS_URL`; add a free Upstash/Redis protocol URL before claiming Redis-backed production rate limiting.
+- Redis was configured in the follow-up section below and is now operational in production.
 - AWS KMS/HSM is implemented through `SIGNING_KEY_PROVIDER=kms` and `KMS_KEY_ARN`, but production Vercel currently lacks AWS/KMS credentials and a real KMS key.
-- OIDC/SCIM APIs are implemented, but production Vercel currently lacks `OIDC_*` and `SCIM_BEARER_TOKEN` values.
+- OIDC APIs are implemented, but production Vercel currently lacks `OIDC_*` values.
+- SCIM was configured in the follow-up section below and is now visible in production readiness.
 - SIEM export is implemented through signed webhooks, but each workspace still needs a real webhook/SIEM URL configured in Settings.
 - Git history cleanup was completed in the follow-up section below.
 
@@ -4191,7 +4192,43 @@ Finish the enterprise integration hardening pass, deploy it, verify it on the ho
 
 ### Remaining External Actions
 - Rotate the old Groq key in the Groq dashboard if it was ever real. History cleanup reduces repository exposure, but it cannot invalidate a provider key or remove copies from clones/caches.
-- Add a real free Redis URL, for example Upstash Redis protocol URL, to Vercel as `REDIS_URL` to move production rate limiting/session coordination from fallback mode to Redis-backed mode.
+- Redis is now backed by a real free Upstash Redis integration connected through Vercel.
 - Add AWS KMS/HSM credentials and `KMS_KEY_ARN` only after creating a real KMS key. The code path is ready, but the provider cannot be configured without AWS account credentials.
-- Add real OIDC provider values (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`) and a generated `SCIM_BEARER_TOKEN` before claiming SSO/SCIM configured in production.
+- Add real OIDC provider values (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`) before claiming OIDC SSO configured in production.
+- SCIM production/development bearer tokens are configured in Vercel.
 - Configure a real SIEM/webhook destination per workspace in Settings before claiming SIEM export is live for that workspace.
+
+## 2026-06-07 - Redis and SCIM Provider Configuration Pass
+
+### User Request
+Configure the remaining provider-backed enterprise values rather than leaving readiness as fallback where possible.
+
+### Changes Made
+- Provisioned a real free Upstash Redis resource through the Vercel Marketplace:
+  - Product: Upstash for Redis
+  - Plan: Free
+  - Resource name: `agentshield-redis`
+  - Primary region: `iad1`
+  - Connected environments: production, preview, development
+- Vercel now provides `REDIS_URL` plus Upstash/Vercel KV companion variables.
+- Generated and added `SCIM_BEARER_TOKEN` to production and development Vercel environments.
+- Vercel CLI repeatedly returned `git_branch_required` / `branch_not_found` for preview SCIM token creation; production is configured and verified.
+- Added `.env*.local` to `.gitignore` because the Vercel integration pulled local secret-bearing env files.
+- Redeployed production to apply the new environment variables.
+
+### Verification
+- `GET https://agentshield-sigma.vercel.app/api/ready` now reports:
+  - `redis.configured: true`
+  - `redis.connected: true`
+  - `redis.mode: redis`
+  - `sso.scim_configured: true`
+  - `ledger_valid: true`
+- Fresh hosted workspace enterprise readiness reports:
+  - Redis: `operational`
+  - SCIM: `configured`
+  - KMS/HSM: `not_configured`
+  - OIDC SSO: `not_configured`
+
+### Still Requires Provider Account Setup
+- KMS/HSM cannot be truthfully configured without an AWS account, IAM credentials or workload identity, and a real KMS key ARN.
+- OIDC SSO cannot be truthfully configured without an identity provider app/client such as Google Workspace, Okta, Auth0, Clerk, or Azure AD and the issued client ID/client secret.

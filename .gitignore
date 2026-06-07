@@ -30,3 +30,4 @@ scratch/
 test-results/
 .vercel
 .neon
+.env*.local
