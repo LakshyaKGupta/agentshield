@@ -33,6 +33,36 @@ from .store import AgentRecord, CryptographicKey, InMemoryStore, Tenant, Workspa
 from uuid import uuid4
 from .security.api_keys import create_api_key
 
+LIVE_TIMEOUT_SECONDS = 300
+
+
+def _coerce_datetime(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value))
+        except (TypeError, ValueError):
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def is_agent_currently_live(agent: AgentRecord, *, now: datetime | None = None) -> bool:
+    if agent.status != "active":
+        return False
+    metadata = agent.metadata or {}
+    if metadata.get("is_internal_proof") is True:
+        return False
+    last_live_at = _coerce_datetime(metadata.get("last_live_at"))
+    if last_live_at is None:
+        return False
+    current = now or datetime.now(timezone.utc)
+    return (current - last_live_at).total_seconds() < LIVE_TIMEOUT_SECONDS
+
 
 def _public_key_from_private(private_key_pem: str) -> str:
     from cryptography.hazmat.primitives import serialization
@@ -436,7 +466,7 @@ def spawn_agent(store: InMemoryStore, settings: Settings, request: AgentCreateRe
         token=token,
         token_expires_at=expires_at,
         permissions=agent.permissions,
-        live_connected=bool(agent.metadata.get("live_connected")),
+        live_connected=is_agent_currently_live(agent),
         first_live_at=agent.metadata.get("first_live_at"),
         last_live_at=agent.metadata.get("last_live_at"),
         runtime_source=_agent_source(agent),
@@ -551,7 +581,7 @@ def _agent_response(store: InMemoryStore, settings: Settings, agent: AgentRecord
         last_seen = max(live_times) if live_times else agent.metadata.get("last_live_at")
         
     is_active = agent.status == "active"
-    live_connected = bool(agent.metadata.get("live_connected")) and is_active
+    live_connected = is_agent_currently_live(agent)
 
     return AgentResponse(
         agent_id=agent.id,

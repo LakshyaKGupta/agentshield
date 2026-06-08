@@ -4264,3 +4264,33 @@ Fix intermittent white screens on `https://agentshield-sigma.vercel.app/`, updat
 ### Notes
 - This does not hide real React errors; the existing React error boundary still handles render-time exceptions.
 - This specifically protects the pre-React blank-root failure class caused by interrupted/stale module or asset loading.
+
+## 2026-06-08 - Runtime Live-State Freshness Fix
+
+### User Request
+Fix the bug where Live Protection, Dashboard, Evidence readiness, Enterprise, and onboarding could show stale "Connected" state, protected-request counts, or runtime evidence after an agent had sent traffic once in the past.
+
+### Root Cause
+- Backend readers trusted the persisted `agent.metadata["live_connected"]` boolean.
+- The boolean was set on SDK/runtime traffic and never expired.
+- Frontend pages also trusted `agent.live_connected`, stale `last_live_at`, and historical `requests_screened` values for current runtime status.
+- Built-in `/v1/proof/run` wrote proof ledger entries using the same enforcement engine and could leave proof-agent live metadata behind.
+
+### Changes Made
+- Added `LIVE_TIMEOUT_SECONDS = 300` and `is_agent_currently_live()` in `backend/app/services.py`.
+- Backend `AgentResponse.live_connected`, `/v1/metrics`, `/v1/threats`, `/v1/enterprise/readiness`, chat context, streaming chat context, and `/v1/agents/{agent_id}/runtime-evidence` now derive current live state from fresh `last_live_at` instead of reading the stored boolean.
+- Runtime endpoints still write `live_connected = True` for backward compatibility, but `_mark_agent_live_if_sdk()` now refuses to mark internal proof agents live.
+- `/v1/proof/run` explicitly clears `live_connected`, `last_live_at`, and `first_live_at` on the proof agent after proof execution.
+- Frontend added a matching five-minute `isAgentCurrentlyLive()` helper.
+- Dashboard, Live Protection, Enterprise, Agent Registry, Playground, Protect Agent, and runtime evidence panels now use current live state.
+- Live Protection runtime decisions and counts only include `live_runtime` decision rows for currently-live, non-simulation agents.
+- Proof agents are excluded by `runtime_source === "console_proof"`, `metadata.is_internal_proof`, and the name `AgentShield Proof Agent`.
+- Protect Agent Step 5 no longer completes from historical `last_live_at` or old request totals.
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed: 49 tests, 3 skipped because no disposable Postgres integration database was configured.
+- `cd frontend && npm run build` passed.
+- Added regression coverage:
+  - Stored `live_connected=True` without `last_live_at` is not live.
+  - `last_live_at` older than five minutes is not live.
+  - `/v1/proof/run` does not mark proof agents or real registered agents live.

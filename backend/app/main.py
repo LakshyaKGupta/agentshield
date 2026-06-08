@@ -32,7 +32,7 @@ from .security.session import (
     configure_postgres as _session_configure_postgres,
     rotate_session,
 )
-from .services import analyze_message, build_agent_security_summary, check_tool_call, ensure_tenant_signing_key, firebase_verify_and_login, list_agents, login_workspace, revoke_agent, run_attack_simulation, signup_workspace, spawn_agent, update_agent_manifest
+from .services import analyze_message, build_agent_security_summary, check_tool_call, ensure_tenant_signing_key, firebase_verify_and_login, is_agent_currently_live, list_agents, login_workspace, revoke_agent, run_attack_simulation, signup_workspace, spawn_agent, update_agent_manifest
 from .settings import get_settings
 from .store import create_store
 
@@ -491,6 +491,8 @@ def _mark_agent_live_if_sdk(api_key, agent) -> None:
         return
     if getattr(agent, "status", None) != "active":
         return
+    if (getattr(agent, "metadata", {}) or {}).get("is_internal_proof") is True:
+        return
     now = datetime.now(timezone.utc).isoformat()
     if not agent.metadata.get("first_live_at"):
         agent.metadata["first_live_at"] = now
@@ -509,6 +511,8 @@ def _is_simulation_agent_record(agent) -> bool:
         bool(metadata.get("is_simulation"))
         or bool(metadata.get("is_internal_proof"))
         or metadata.get("runtime_source") == "simulation"
+        or metadata.get("runtime_source") == "console_proof"
+        or str(getattr(agent, "name", "")) == "AgentShield Proof Agent"
         or str(getattr(agent, "name", "")).startswith("sim-")
     )
 
@@ -851,9 +855,8 @@ def threats(api_key=Depends(require_api_key)):
         agent.id
         for agent in store.agents.values()
         if agent.tenant_id == api_key.tenant_id
-        and agent.status == "active"
+        and is_agent_currently_live(agent)
         and not _is_simulation_agent_record(agent)
-        and (agent.metadata or {}).get("live_connected")
     }
     tenant_threats = [threat for threat in store.threat_events if threat.get("agent_id") in live_agent_ids]
     return ThreatPage(threats=tenant_threats)
@@ -982,6 +985,13 @@ def run_protection_proof(
         affects_score=False,
         request_id=getattr(http_request.state, "request_id", None),
     )
+
+    proof_agent_obj = store.agents.get(proof_agent_id)
+    if proof_agent_obj:
+        proof_agent_obj.metadata["live_connected"] = False
+        proof_agent_obj.metadata["last_live_at"] = None
+        proof_agent_obj.metadata["first_live_at"] = None
+        store.persist_agent(proof_agent_obj)
 
     return {
         "source": "console_proof",
@@ -1374,7 +1384,7 @@ def chat(body: dict, http_request: Request):
 
     tenant_agents = [a for a in store.agents.values() if tid and a.tenant_id == tid]
     registered_agents = [a for a in tenant_agents if not _is_simulation_agent_record(a)]
-    live_agents = [a for a in registered_agents if a.status == "active" and (a.metadata or {}).get("live_connected")]
+    live_agents = [a for a in registered_agents if is_agent_currently_live(a)]
     live_agent_ids = {a.id for a in live_agents}
     tenant_threats = [t for t in store.threat_events if t.get("agent_id") in live_agent_ids]
     tenant_ledger = [entry for entry in store.ledger if tid and entry.tenant_id == tid]
@@ -1727,7 +1737,7 @@ async def chat_stream(body: dict, http_request: Request):
 
     tenant_agents = [a for a in store.agents.values() if tid and a.tenant_id == tid]
     registered_agents = [a for a in tenant_agents if not _is_simulation_agent_record(a)]
-    live_agents = [a for a in registered_agents if a.status == "active" and (a.metadata or {}).get("live_connected")]
+    live_agents = [a for a in registered_agents if is_agent_currently_live(a)]
     live_agent_ids = {a.id for a in live_agents}
     tenant_threats = [t for t in store.threat_events if t.get("agent_id") in live_agent_ids]
     tenant_ledger = [entry for entry in store.ledger if tid and entry.tenant_id == tid]
@@ -2079,7 +2089,7 @@ def metrics(api_key=Depends(require_api_key)):
     tid = api_key.tenant_id
     tenant_agents  = [a for a in store.agents.values()  if a.tenant_id == tid]
     registered_agents = [a for a in tenant_agents if not _is_simulation_agent_record(a)]
-    live_agent_ids = {a.id for a in registered_agents if a.status == "active" and (a.metadata or {}).get("live_connected")}
+    live_agent_ids = {a.id for a in registered_agents if is_agent_currently_live(a)}
     tenant_ledger  = [e for e in store.ledger            if e.tenant_id == tid]
     live_ledger = [e for e in tenant_ledger if _ledger_entry_source(e) == "live_runtime" and e.agent_id in live_agent_ids]
     tenant_threats = [
@@ -2147,7 +2157,7 @@ def enterprise_readiness(api_key=Depends(require_api_key)):
     tenant = store.tenants.get(api_key.tenant_id)
     prefs = tenant.preferences if tenant else {}
     tenant_agents = [agent for agent in store.agents.values() if agent.tenant_id == api_key.tenant_id and not _is_simulation_agent_record(agent)]
-    live_agents = [agent for agent in tenant_agents if agent.status == "active" and (agent.metadata or {}).get("live_connected")]
+    live_agents = [agent for agent in tenant_agents if is_agent_currently_live(agent)]
     ledger_status = verify_ledger(store)
     redis_state = _redis_readiness()
     kms_state = _kms_readiness()
@@ -2691,7 +2701,9 @@ def get_agent_runtime_evidence(agent_id: UUID, api_key=Depends(require_api_key))
     sdk_keys = [k for k in store.api_keys.values() if k.tenant_id == api_key.tenant_id and k.key_type == "sdk" and k.status == "active"]
     sdk_connected = len(sdk_keys) > 0
     
-    # Calculate protected requests from live_runtime source only
+    is_live_active = is_agent_currently_live(agent)
+
+    # Calculate historical protected requests from live_runtime source only.
     protected_requests = sum(
         1 for entry in store.ledger
         if entry.agent_id == agent_id
@@ -2714,8 +2726,6 @@ def get_agent_runtime_evidence(agent_id: UUID, api_key=Depends(require_api_key))
         and (entry.event_data or {}).get("source") == "live_runtime"
         and getattr(entry, "verdict", None) == Verdict.BLOCKED
     )
-    
-    is_live_active = agent.status == "active" and bool(agent.metadata.get("live_connected", False))
 
     return {
         "sdk_connected": sdk_connected,
@@ -2724,10 +2734,10 @@ def get_agent_runtime_evidence(agent_id: UUID, api_key=Depends(require_api_key))
         "currently_active": is_live_active,
         "first_protected_request": agent.metadata.get("first_live_at"),
         "last_protected_request": agent.metadata.get("last_live_at"),
-        "protected_requests": protected_requests,
+        "protected_requests": protected_requests if is_live_active else 0,
         "historical_protected_requests": protected_requests,
-        "allowed_requests": allowed_requests,
-        "blocked_threats": blocked_threats
+        "allowed_requests": allowed_requests if is_live_active else 0,
+        "blocked_threats": blocked_threats if is_live_active else 0
     }
 
 
