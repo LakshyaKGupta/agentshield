@@ -503,10 +503,39 @@ def _mark_agent_live_if_sdk(api_key, agent, event_source: str = "live_runtime") 
     store.persist_agent(agent)
 
 
-def _runtime_event_source(api_key, requested_source: str | None = None) -> str:
-    if requested_source and requested_source.strip().lower() in {"console_verification", "console-proof", "console_proof"}:
+def _context_marks_console_verification(context: dict | None) -> bool:
+    if not isinstance(context, dict):
+        return False
+    marker_values = {
+        str(context.get("verification") or "").strip().lower(),
+        str(context.get("source") or "").strip().lower(),
+        str(context.get("runtime_source") or "").strip().lower(),
+    }
+    return (
+        bool(context.get("proof_test"))
+        or "console_live_api" in marker_values
+        or "console_api_proof" in marker_values
+        or "console_verification" in marker_values
+        or "console-proof" in marker_values
+        or "console_proof" in marker_values
+    )
+
+
+def _runtime_event_source(
+    api_key,
+    requested_source: str | None = None,
+    context: dict | None = None,
+    *,
+    has_agent_token: bool = False,
+) -> str:
+    if (
+        requested_source
+        and requested_source.strip().lower() in {"console_verification", "console-proof", "console_proof"}
+    ) or _context_marks_console_verification(context):
         return "console_verification"
-    return "live_runtime" if getattr(api_key, "key_type", "session") == "sdk" else "console"
+    if getattr(api_key, "key_type", "session") != "sdk":
+        return "console"
+    return "live_runtime" if has_agent_token else "sdk_unverified"
 
 
 def _runtime_affects_score(api_key, event_source: str) -> bool:
@@ -720,7 +749,12 @@ def analyze(
 
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
-        event_source = _runtime_event_source(api_key, x_agentshield_source)
+        event_source = _runtime_event_source(
+            api_key,
+            x_agentshield_source,
+            request.context,
+            has_agent_token=bool(token),
+        )
         affects_score = _runtime_affects_score(api_key, event_source)
         verdict = analyze_message(
             store,
@@ -731,7 +765,7 @@ def analyze(
             event_source=event_source,
             affects_score=affects_score,
             request_id=request_id,
-            bypass_token_validation=True,
+            bypass_token_validation=event_source not in {"live_runtime", "console_verification"},
         )
         if agent is not None and verdict.ledger_id:
             _mark_agent_live_if_sdk(api_key, agent, event_source)
@@ -787,7 +821,12 @@ def tool_call(
 
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
-        event_source = _runtime_event_source(api_key, x_agentshield_source)
+        event_source = _runtime_event_source(
+            api_key,
+            x_agentshield_source,
+            request.risk_context,
+            has_agent_token=bool(token),
+        )
         affects_score = _runtime_affects_score(api_key, event_source)
         verdict = check_tool_call(
             store,
@@ -798,7 +837,7 @@ def tool_call(
             event_source=event_source,
             affects_score=affects_score,
             request_id=request_id,
-            bypass_token_validation=True,
+            bypass_token_validation=event_source not in {"live_runtime", "console_verification"},
         )
         if agent is not None and verdict.ledger_id:
             _mark_agent_live_if_sdk(api_key, agent, event_source)
@@ -1117,6 +1156,7 @@ def execute_tool(body: ToolExecuteRequest, api_key=Depends(require_api_key)):
 
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
+        event_source = _runtime_event_source(api_key, has_agent_token=bool(body.token))
         verdict = check_tool_call(
             store,
             settings,
@@ -1128,13 +1168,13 @@ def execute_tool(body: ToolExecuteRequest, api_key=Depends(require_api_key)):
             ),
             body.token,
             tenant_pub,
-            event_source=_runtime_event_source(api_key),
-            affects_score=getattr(api_key, "key_type", "session") == "sdk",
+            event_source=event_source,
+            affects_score=_runtime_affects_score(api_key, event_source),
         )
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)}) from exc
     if verdict.ledger_id:
-        _mark_agent_live_if_sdk(api_key, agent)
+        _mark_agent_live_if_sdk(api_key, agent, event_source)
 
     if not verdict.allowed:
         return {
@@ -1187,17 +1227,18 @@ def agent_run(body: AgentRunRequest, api_key=Depends(require_api_key)):
     # Step 1: AgentShield screens inbound prompt
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
+        event_source = _runtime_event_source(api_key, has_agent_token=bool(token))
         shield_verdict = analyze_message(
             store, settings,
             AnalyzeRequest(agent_id=agent_uuid, direction="inbound", message=user_msg),
             token, tenant_pub,
-            event_source=_runtime_event_source(api_key),
-            affects_score=getattr(api_key, "key_type", "session") == "sdk",
+            event_source=event_source,
+            affects_score=_runtime_affects_score(api_key, event_source),
         )
     except PermissionError as exc:
         raise HTTPException(status_code=401, detail={"code": str(exc)})
     if shield_verdict.ledger_id:
-        _mark_agent_live_if_sdk(api_key, agent)
+        _mark_agent_live_if_sdk(api_key, agent, event_source)
 
     trace.append({
         "stage": "PROMPT_SCREEN",
@@ -1290,8 +1331,8 @@ def agent_run(body: AgentRunRequest, api_key=Depends(require_api_key)):
                         store, settings,
                         ToolCallRequest(agent_id=agent_uuid, tool_name=fn_name, action=action),
                         token, tenant_pub,
-                        event_source=_runtime_event_source(api_key),
-                        affects_score=getattr(api_key, "key_type", "session") == "sdk",
+                        event_source=event_source,
+                        affects_score=_runtime_affects_score(api_key, event_source),
                     )
                     t_allowed = tool_verdict.allowed
                     t_verdict = tool_verdict.verdict.value

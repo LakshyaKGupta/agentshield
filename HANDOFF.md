@@ -4343,3 +4343,38 @@ Fix the broader false activation problem where a user could register an agent, c
 - `python3 -m unittest discover -s tests -v` passed: 50 tests, 3 skipped because no disposable Postgres integration database was configured.
 - `cd frontend && npm run build` passed.
 - `python3 -m compileall sdk/python/agentshield scripts/external_demo_agent.py backend/app` passed.
+
+## 2026-06-08 - Agent Runtime Source Hardening
+
+### User Request
+Fix the false-live path where a user could register an agent in the website, run the provided verification command, and then see Live Protection show runtime decisions, protected requests, and blocked threats without connecting a real external agent runtime.
+
+### Root Cause
+- SDK-key-only calls to `/v1/shield/analyze` were treated as `live_runtime`.
+- Console proof headers were accepted without requiring the agent JWT.
+- Older website verification contexts such as `console_live_api` were not automatically classified as console proof.
+- Visible and legacy UI labels still used "SDK Connected" after only key creation, which implied runtime connectivity.
+
+### Changes Made
+- Added `_context_marks_console_verification()` in `backend/app/main.py`.
+- Runtime event classification now separates:
+  - `live_runtime`: SDK key plus agent JWT.
+  - `console_verification`: explicit console proof header or legacy proof context, with agent JWT verification.
+  - `sdk_unverified`: SDK key without agent JWT; returns a verdict but never marks live, affects score, or contributes to runtime evidence.
+  - `console`: browser/session traffic.
+- `/v1/shield/analyze`, `/v1/shield/tool-call`, `/v1/tools/execute`, and `/v1/agent/run` now pass token-aware event-source state into enforcement and live-marking.
+- Console proof curl now includes the agent JWT.
+- Protect Agent Step 5 now says "Connection Package Ready" instead of "SDK Connected".
+- Legacy runtime evidence/checklist copy now says "SDK Key Issued" or "Connection Package Ready" rather than implying runtime is connected.
+- Added optional `AGENTSHIELD_EVENT_SOURCE` support to the Node SDK to match the Python SDK.
+
+### Verification
+- `python3 -m unittest tests.test_security_core -v` passed.
+- `python3 -m unittest discover -s tests -v` passed: 52 tests, 3 skipped because no disposable Postgres integration database was configured.
+- `cd frontend && npm run build` passed.
+- `python3 -m compileall backend/app sdk/python/agentshield scripts/external_demo_agent.py && cd sdk/nodejs && npm run build` passed.
+- Added regression coverage:
+  - SDK-key-only shield calls write `source=sdk_unverified`, do not affect score, do not set `live_connected`, and do not set `last_live_at`.
+  - Console proof with agent JWT writes `source=console_verification` and does not mark live.
+  - Console proof without agent JWT is rejected and writes no ledger entry.
+  - Legacy `context.verification=console_live_api` is classified as console proof and does not mark live.

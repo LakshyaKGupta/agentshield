@@ -58,13 +58,15 @@ export class AgentShield {
   public api_key: string;
   public base_url: string;
   public timeout: number;
+  public event_source: string | null;
 
-  constructor(api_key: string, base_url: string = "http://localhost:8000", timeout: number = 10.0) {
+  constructor(api_key: string, base_url: string = "http://localhost:8000", timeout: number = 10.0, event_source: string | null = null) {
     this.api_key = api_key;
     // Strip trailing slash if present
     this.base_url = base_url.replace(/\/+$/, "");
     // Convert timeout seconds to milliseconds
     this.timeout = timeout * 1000;
+    this.event_source = event_source;
   }
 
   /**
@@ -72,6 +74,7 @@ export class AgentShield {
    * Reads:
    * - AGENTSHIELD_API_KEY (required)
    * - AGENTSHIELD_BASE_URL (optional, defaults to http://localhost:8000)
+   * - AGENTSHIELD_EVENT_SOURCE (optional, for console verification tooling)
    */
   public static from_env(): AgentShield {
     const apiKey = typeof process !== "undefined" ? process.env.AGENTSHIELD_API_KEY : "";
@@ -81,7 +84,8 @@ export class AgentShield {
       );
     }
     const baseUrl = (typeof process !== "undefined" && process.env.AGENTSHIELD_BASE_URL) || "http://localhost:8000";
-    return new AgentShield(apiKey, baseUrl);
+    const eventSource = (typeof process !== "undefined" && process.env.AGENTSHIELD_EVENT_SOURCE) || null;
+    return new AgentShield(apiKey, baseUrl, 10.0, eventSource);
   }
 
   /**
@@ -131,6 +135,9 @@ export class AgentShield {
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
+    }
+    if (this.event_source) {
+      headers["X-AgentShield-Source"] = this.event_source;
     }
 
     const abortController = new AbortController();

@@ -863,7 +863,7 @@ class SecurityCoreTests(unittest.TestCase):
             self.assertEqual(encryptor.decrypt(ciphertext), "secret")
 
     def test_sdk_api_key_runtime_auth(self) -> None:
-        """Verify that SDK API keys authorize runtime requests with no agent token, support case-insensitivity, and handle missing/invalid/revoked keys."""
+        """Verify SDK-key-only shield calls return verdicts but never create live runtime evidence."""
         from fastapi.testclient import TestClient
         from backend.app.main import app
         from unittest.mock import patch
@@ -894,6 +894,10 @@ class SecurityCoreTests(unittest.TestCase):
             resp_1 = client.post("/v1/shield/analyze", headers=headers_1, json=payload)
             self.assertEqual(resp_1.status_code, 200)
             self.assertTrue(resp_1.json()["allowed"])
+            self.assertEqual(self.store.ledger[-1].event_data["source"], "sdk_unverified")
+            self.assertFalse(self.store.ledger[-1].event_data["affects_score"])
+            self.assertFalse(self.store.agents[self.agent.agent_id].metadata.get("live_connected", False))
+            self.assertIsNone(self.store.agents[self.agent.agent_id].metadata.get("last_live_at"))
             
             # 2. Valid request using x-api-key (case-insensitive lowercase)
             headers_2 = {
@@ -902,6 +906,7 @@ class SecurityCoreTests(unittest.TestCase):
             resp_2 = client.post("/v1/shield/analyze", headers=headers_2, json=payload)
             self.assertEqual(resp_2.status_code, 200)
             self.assertTrue(resp_2.json()["allowed"])
+            self.assertEqual(self.store.ledger[-1].event_data["source"], "sdk_unverified")
             
             # 3. Valid request using Authorization: Bearer as_live_xxx
             headers_3 = {
@@ -910,6 +915,7 @@ class SecurityCoreTests(unittest.TestCase):
             resp_3 = client.post("/v1/shield/analyze", headers=headers_3, json=payload)
             self.assertEqual(resp_3.status_code, 200)
             self.assertTrue(resp_3.json()["allowed"])
+            self.assertEqual(self.store.ledger[-1].event_data["source"], "sdk_unverified")
             
             # 4. Invalid key -> expects AUTH_API_KEY_INVALID (401)
             headers_invalid = {
@@ -957,6 +963,7 @@ class SecurityCoreTests(unittest.TestCase):
             headers = {
                 "X-AgentShield-API-Key": sdk_key,
                 "X-AgentShield-Source": "console_verification",
+                "Authorization": f"Bearer {self.agent.token}",
             }
 
             resp = client.post("/v1/shield/analyze", headers=headers, json=payload)
@@ -978,6 +985,71 @@ class SecurityCoreTests(unittest.TestCase):
             self.assertFalse(evidence["currently_connected"])
             self.assertEqual(evidence["protected_requests"], 0)
             self.assertEqual(evidence["historical_protected_requests"], 0)
+
+    def test_console_verification_without_agent_jwt_is_rejected(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+        from unittest.mock import patch
+
+        client = TestClient(app)
+        with patch("backend.app.main.store", self.store):
+            sdk_key = create_api_key(
+                self.store,
+                self.settings,
+                self.tenant.id,
+                ["agents:write", "shield:write", "ledger:read", "threats:read"],
+                name="Console Proof Key",
+                key_type="sdk",
+            )
+            payload = {
+                "agent_id": str(self.agent.agent_id),
+                "direction": "inbound",
+                "message": "Hello from console proof.",
+            }
+            headers = {
+                "X-AgentShield-API-Key": sdk_key,
+                "X-AgentShield-Source": "console_verification",
+            }
+
+            before = len(self.store.ledger)
+            resp = client.post("/v1/shield/analyze", headers=headers, json=payload)
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(len(self.store.ledger), before)
+            self.assertFalse(self.store.agents[self.agent.agent_id].metadata.get("live_connected", False))
+
+    def test_legacy_console_verification_context_does_not_mark_agent_live(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+        from unittest.mock import patch
+
+        client = TestClient(app)
+        with patch("backend.app.main.store", self.store):
+            sdk_key = create_api_key(
+                self.store,
+                self.settings,
+                self.tenant.id,
+                ["agents:write", "shield:write", "ledger:read", "threats:read"],
+                name="Legacy Console Proof Key",
+                key_type="sdk",
+            )
+            payload = {
+                "agent_id": str(self.agent.agent_id),
+                "direction": "inbound",
+                "message": "Hello from old website verification.",
+                "context": {"verification": "console_live_api"},
+            }
+            headers = {
+                "X-AgentShield-API-Key": sdk_key,
+                "Authorization": f"Bearer {self.agent.token}",
+            }
+
+            resp = client.post("/v1/shield/analyze", headers=headers, json=payload)
+            self.assertEqual(resp.status_code, 200, resp.text)
+            self.assertTrue(resp.json()["allowed"])
+            self.assertEqual(self.store.ledger[-1].event_data["source"], "console_verification")
+            self.assertFalse(self.store.ledger[-1].event_data["affects_score"])
+            self.assertFalse(self.store.agents[self.agent.agent_id].metadata.get("live_connected", False))
+            self.assertIsNone(self.store.agents[self.agent.agent_id].metadata.get("last_live_at"))
 
 
 
