@@ -82,6 +82,7 @@ class AgentShield:
     api_key: str
     base_url: str = "http://localhost:8000"
     timeout: float = 10.0
+    event_source: str | None = None
 
     # ── Constructor helpers ───────────────────────────────────────────────────
 
@@ -100,7 +101,8 @@ class AgentShield:
                 "Export it or pass api_key= directly."
             )
         base_url = os.environ.get("AGENTSHIELD_BASE_URL", "http://localhost:8000")
-        return cls(api_key=api_key, base_url=base_url)
+        event_source = os.environ.get("AGENTSHIELD_EVENT_SOURCE") or None
+        return cls(api_key=api_key, base_url=base_url, event_source=event_source)
 
     # ── High-level agent helper ───────────────────────────────────────────────
 
@@ -160,6 +162,8 @@ class AgentShield:
     def _request(self, method: str, path: str, body: dict[str, Any] | None = None, token: str | None = None) -> dict[str, Any]:
         data = json.dumps(body or {}).encode() if body is not None else None
         headers = {"X-AgentShield-API-Key": self.api_key, "Content-Type": "application/json"}
+        if self.event_source:
+            headers["X-AgentShield-Source"] = self.event_source
         if token:
             headers["Authorization"] = f"Bearer {token}"
         request = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)

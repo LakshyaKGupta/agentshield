@@ -4294,3 +4294,52 @@ Fix the bug where Live Protection, Dashboard, Evidence readiness, Enterprise, an
   - Stored `live_connected=True` without `last_live_at` is not live.
   - `last_live_at` older than five minutes is not live.
   - `/v1/proof/run` does not mark proof agents or real registered agents live.
+
+## 2026-06-08 - Console Verification No Longer Marks Agents Live
+
+### User Request
+Fix the remaining false-positive activation path where running the website's built-in verification/curl after registering an agent caused Live Protection to show `Connected`, protected requests, blocked threats, and runtime decisions even though no external agent runtime was connected.
+
+### Root Cause
+- Protect Agent Step 5 called `/v1/shield/analyze` directly from the browser using the newly-created SDK key.
+- The backend classified any SDK-key shield request as `source=live_runtime`, affected trust score, and called `_mark_agent_live_if_sdk()`.
+- The copied curl command did the same thing, so a console proof was indistinguishable from a real external runtime request.
+
+### Changes Made
+- Added `X-AgentShield-Source: console_verification` support to `/v1/shield/analyze` and `/v1/shield/tool-call`.
+- Console verification requests now write ledger entries with `source=console_verification`, `affects_score=false`, and do not call live-agent activation.
+- `_mark_agent_live_if_sdk()` now also requires `event_source == "live_runtime"`.
+- Updated Protect Agent frontend:
+  - `runLiveApiVerification` renamed to console proof behavior.
+  - Browser verification button sends `X-AgentShield-Source: console_verification`.
+  - Copied curl includes `X-AgentShield-Source: console_verification`.
+  - UI copy now says this proves API/ledger behavior without marking the agent live.
+- Added regression test `test_console_verification_header_does_not_mark_agent_live`.
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed: 50 tests, 3 skipped because no disposable Postgres integration database was configured.
+- `cd frontend && npm run build` passed.
+
+## 2026-06-08 - Demo Script No Longer Activates Live Protection
+
+### User Request
+Fix the broader false activation problem where a user could register an agent, copy/run a generated website command, and see Live Protection show connected/runtime decisions even though they had not connected their own real agent app.
+
+### Changes Made
+- Added optional `event_source` support to the Python SDK.
+  - `AgentShield.from_env()` reads `AGENTSHIELD_EVENT_SOURCE`.
+  - SDK requests include `X-AgentShield-Source` only when explicitly set.
+  - Normal SDK users remain unchanged and still create `live_runtime` traffic.
+- Updated `scripts/external_demo_agent.py`.
+  - It now defaults `AGENTSHIELD_EVENT_SOURCE=console_verification`.
+  - It verifies that the demo/proof path does not activate Live Protection.
+  - It no longer claims to write live runtime evidence.
+- Updated Protect Agent Step 5.
+  - The generated demo command includes `AGENTSHIELD_EVENT_SOURCE="console_verification"`.
+  - UI copy now says SDK console proof, not live external runtime.
+  - Live Protection activation copy now points users to their own real external agent app.
+
+### Verification
+- `python3 -m unittest discover -s tests -v` passed: 50 tests, 3 skipped because no disposable Postgres integration database was configured.
+- `cd frontend && npm run build` passed.
+- `python3 -m compileall sdk/python/agentshield scripts/external_demo_agent.py backend/app` passed.

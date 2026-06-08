@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run a real external AgentShield demo agent.
+"""Run an external AgentShield console proof agent.
 
-This script intentionally runs outside the browser console flow. It uses the
-Python SDK plus a real SDK API key to send protected runtime traffic into
-AgentShield, then verifies that live evidence exists.
+This script intentionally proves the SDK/API path without marking an agent as
+live-connected. Real product activation should come from the user's own agent
+runtime, not this canned demo script.
 
 Required environment:
   AGENTSHIELD_API_KEY      one-time SDK key from Protect Agent
@@ -13,6 +13,7 @@ Optional environment:
   AGENTSHIELD_AGENT_NAME       defaults to ResearchAgent
   AGENTSHIELD_ALLOWED_TOOL     defaults to web_search
   AGENTSHIELD_ALLOWED_ACTION   defaults to read
+  AGENTSHIELD_EVENT_SOURCE     defaults to console_verification for this script
 """
 
 from __future__ import annotations
@@ -65,9 +66,10 @@ def main() -> int:
     agent_name = os.environ.get("AGENTSHIELD_AGENT_NAME", "ResearchAgent").strip() or "ResearchAgent"
     allowed_tool = os.environ.get("AGENTSHIELD_ALLOWED_TOOL", "web_search").strip() or "web_search"
     allowed_action = os.environ.get("AGENTSHIELD_ALLOWED_ACTION", "read").strip() or "read"
+    os.environ.setdefault("AGENTSHIELD_EVENT_SOURCE", "console_verification")
 
     shield = AgentShield(api_key=api_key, base_url=base_url)
-    print(f"AgentShield external demo agent connecting to {base_url}")
+    print(f"AgentShield console proof agent connecting to {base_url}")
     print(f"Agent name: {agent_name}")
 
     agent = shield.agent(
@@ -115,11 +117,11 @@ def main() -> int:
     blocked_threats = int(evidence.get("blocked_threats") or 0)
     runtime_active = bool(evidence.get("currently_active") or evidence.get("runtime_active"))
     _print_gate(
-        "Runtime evidence recorded",
-        runtime_active and protected_requests >= 3 and blocked_threats >= 1,
-        f"requests={protected_requests}, blocked={blocked_threats}, active={runtime_active}",
+        "Console proof did not activate Live Protection",
+        not runtime_active,
+        f"live_active={runtime_active}, live_requests={protected_requests}, live_blocked={blocked_threats}",
     )
-    if not (runtime_active and protected_requests >= 3 and blocked_threats >= 1):
+    if runtime_active:
         return 1
 
     ready = _get_json(base_url, "/ready", api_key)
@@ -127,7 +129,7 @@ def main() -> int:
     if not ready.get("ledger_valid"):
         return 1
 
-    print("\nExternal demo agent finished. Refresh Live Protection and Evidence to inspect the live runtime records.")
+    print("\nConsole proof finished. Live Protection should still wait for your real external agent runtime.")
     return 0
 
 

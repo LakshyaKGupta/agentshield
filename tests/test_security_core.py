@@ -934,6 +934,51 @@ class SecurityCoreTests(unittest.TestCase):
             self.assertEqual(resp_revoked.status_code, 401)
             self.assertEqual(resp_revoked.json()["error"]["code"], "AUTH_API_KEY_REVOKED")
 
+    def test_console_verification_header_does_not_mark_agent_live(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app, get_agent_runtime_evidence
+        from unittest.mock import patch
+
+        client = TestClient(app)
+        with patch("backend.app.main.store", self.store):
+            sdk_key = create_api_key(
+                self.store,
+                self.settings,
+                self.tenant.id,
+                ["agents:write", "shield:write", "ledger:read", "threats:read"],
+                name="Console Proof Key",
+                key_type="sdk",
+            )
+            payload = {
+                "agent_id": str(self.agent.agent_id),
+                "direction": "inbound",
+                "message": "Hello from console proof.",
+            }
+            headers = {
+                "X-AgentShield-API-Key": sdk_key,
+                "X-AgentShield-Source": "console_verification",
+            }
+
+            resp = client.post("/v1/shield/analyze", headers=headers, json=payload)
+            self.assertEqual(resp.status_code, 200, resp.text)
+            self.assertTrue(resp.json()["allowed"])
+
+            agent = self.store.agents[self.agent.agent_id]
+            self.assertFalse(agent.metadata.get("live_connected", False))
+            self.assertIsNone(agent.metadata.get("last_live_at"))
+            self.assertEqual(self.store.ledger[-1].event_data["source"], "console_verification")
+            self.assertFalse(self.store.ledger[-1].event_data["affects_score"])
+
+            agents = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
+            agent_response = next(a for a in agents.agents if a.agent_id == self.agent.agent_id)
+            self.assertFalse(agent_response.live_connected)
+
+            api_key_record = authenticate_api_key(self.store, self.settings, sdk_key, "shield:write")
+            evidence = get_agent_runtime_evidence(self.agent.agent_id, api_key_record)
+            self.assertFalse(evidence["currently_connected"])
+            self.assertEqual(evidence["protected_requests"], 0)
+            self.assertEqual(evidence["historical_protected_requests"], 0)
+
 
 
 if __name__ == "__main__":

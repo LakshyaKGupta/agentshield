@@ -486,7 +486,9 @@ def auth_csrf(http_request: Request):
     return {"csrf_token": token}
 
 
-def _mark_agent_live_if_sdk(api_key, agent) -> None:
+def _mark_agent_live_if_sdk(api_key, agent, event_source: str = "live_runtime") -> None:
+    if event_source != "live_runtime":
+        return
     if getattr(api_key, "key_type", "session") != "sdk":
         return
     if getattr(agent, "status", None) != "active":
@@ -501,8 +503,14 @@ def _mark_agent_live_if_sdk(api_key, agent) -> None:
     store.persist_agent(agent)
 
 
-def _runtime_event_source(api_key) -> str:
+def _runtime_event_source(api_key, requested_source: str | None = None) -> str:
+    if requested_source and requested_source.strip().lower() in {"console_verification", "console-proof", "console_proof"}:
+        return "console_verification"
     return "live_runtime" if getattr(api_key, "key_type", "session") == "sdk" else "console"
+
+
+def _runtime_affects_score(api_key, event_source: str) -> bool:
+    return getattr(api_key, "key_type", "session") == "sdk" and event_source == "live_runtime"
 
 
 def _is_simulation_agent_record(agent) -> bool:
@@ -694,6 +702,7 @@ def analyze(
     background_tasks: BackgroundTasks,
     http_request: Request,
     authorization: str | None = Header(default=None),
+    x_agentshield_source: str | None = Header(default=None, alias="X-AgentShield-Source"),
     api_key=Depends(require_api_key)
 ):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
@@ -711,20 +720,22 @@ def analyze(
 
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
+        event_source = _runtime_event_source(api_key, x_agentshield_source)
+        affects_score = _runtime_affects_score(api_key, event_source)
         verdict = analyze_message(
             store,
             settings,
             request,
             token or "",
             tenant_pub,
-            event_source=_runtime_event_source(api_key),
-            affects_score=getattr(api_key, "key_type", "session") == "sdk",
+            event_source=event_source,
+            affects_score=affects_score,
             request_id=request_id,
             bypass_token_validation=True,
         )
         if agent is not None and verdict.ledger_id:
-            _mark_agent_live_if_sdk(api_key, agent)
-        if getattr(api_key, "key_type", "session") == "sdk" and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
+            _mark_agent_live_if_sdk(api_key, agent, event_source)
+        if affects_score and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
             tenant = store.tenants.get(api_key.tenant_id)
             prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
@@ -758,6 +769,7 @@ def tool_call(
     background_tasks: BackgroundTasks,
     http_request: Request,
     authorization: str | None = Header(default=None),
+    x_agentshield_source: str | None = Header(default=None, alias="X-AgentShield-Source"),
     api_key=Depends(require_api_key)
 ):
     token = authorization.removeprefix("Bearer ").strip() if authorization else None
@@ -775,20 +787,22 @@ def tool_call(
 
     try:
         _, tenant_pub = get_tenant_signing_key(store, api_key.tenant_id)
+        event_source = _runtime_event_source(api_key, x_agentshield_source)
+        affects_score = _runtime_affects_score(api_key, event_source)
         verdict = check_tool_call(
             store,
             settings,
             request,
             token or "",
             tenant_pub,
-            event_source=_runtime_event_source(api_key),
-            affects_score=getattr(api_key, "key_type", "session") == "sdk",
+            event_source=event_source,
+            affects_score=affects_score,
             request_id=request_id,
             bypass_token_validation=True,
         )
         if agent is not None and verdict.ledger_id:
-            _mark_agent_live_if_sdk(api_key, agent)
-        if getattr(api_key, "key_type", "session") == "sdk" and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
+            _mark_agent_live_if_sdk(api_key, agent, event_source)
+        if affects_score and verdict.verdict.value in {"BLOCKED", "FLAGGED"}:
             tenant = store.tenants.get(api_key.tenant_id)
             prefs = tenant.preferences if tenant else None
             if prefs and prefs.get("webhook_url"):
