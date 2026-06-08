@@ -465,6 +465,38 @@ class PostgresStore(InMemoryStore):
                 conn.execute(migration.read_text())
                 conn.commit()
 
+        # Ensure new schema columns exist dynamically if they are missing
+        try:
+            with self._connect() as conn:
+                conn.execute("ALTER TABLE workspace_users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'owner'")
+                conn.execute("ALTER TABLE threat_events ADD COLUMN IF NOT EXISTS tenant_id UUID")
+                conn.commit()
+        except Exception as exc:
+            import sys
+            print(f"Startup: failed to verify/alter columns role or tenant_id: {exc}", file=sys.stderr)
+
+        # Expire stale live_connected flags on every cold start.
+        # Prevents a server restart from showing agents as "Connected"
+        # when their last_live_at is older than 5 minutes.
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE agents
+                    SET metadata = metadata || jsonb_build_object('live_connected', false)
+                    WHERE
+                      metadata->>'is_internal_proof' IS DISTINCT FROM 'true'
+                      AND (
+                        metadata->>'last_live_at' IS NULL
+                        OR (NOW() - (metadata->>'last_live_at')::timestamptz) > INTERVAL '5 minutes'
+                      );
+                    """
+                )
+                conn.commit()
+        except Exception as exc:
+            import sys
+            print(f"Startup: failed to expire stale agent connections: {exc}", file=sys.stderr)
+
 
     def persist_tenant(self, tenant: Tenant) -> None:
         with self._connect() as conn:

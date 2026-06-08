@@ -18,8 +18,15 @@ import {
   signInWithPopup,
 } from "./firebase";
 import { apiRequest } from "./api";
+import type { Agent, LedgerEntry, Threat, AppData, AuthResponse, SessionStatus, ReadyStatus, EnterpriseMetrics } from "./types";
+import {
+  fmtHash, agentName, scoreGrade, scoreTone,
+  LIVE_TIMEOUT_MS, isAgentCurrentlyLive, agentDisplayScore, agentLifecycleStatus,
+  isSimulationAgent, ledgerSource, isLiveRuntimeEntry, isLiveRuntimeDecisionEntry,
+  liveRuntimeDecisionEntries, liveRuntimeStats, agentRuntimeStats,
+} from "./utils";
 
-/* ═══════════════════════════ TYPES ══════════════════════════════ */
+/* ═══════════════════════════ CONFIG ═════════════════════════════ */
 const isLocalApiUrl = (value?: string) =>
   Boolean(value && /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(value));
 
@@ -32,52 +39,6 @@ const API_URL = configuredApiUrl && (!import.meta.env.PROD || !isLocalApiUrl(con
         : window.location.origin
     );
 const SESSION_AUTH = "__http_only_session__";
-type Agent = {
-  agent_id: string;
-  name: string;
-  type: string;
-  status: string;
-  trust_score: number;
-  token: string;
-  permissions: { tools: Record<string, string[]> };
-  live_connected?: boolean;
-  first_live_at?: string | null;
-  last_live_at?: string | null;
-  last_seen?: string | null;
-  runtime_source?: string;
-  is_simulation?: boolean;
-  metadata?: Record<string, unknown>;
-};
-type LedgerEntry = { id: number; agent_id: string | null; event_type: string; verdict: "ALLOWED"|"BLOCKED"|"FLAGGED"; severity: string; curr_hash: string; prev_hash: string; created_at: string; event_data: Record<string,unknown> };
-type Threat = { id: string; ledger_id: number; agent_id: string; attack_type: string; confidence: number; evidence: string; resolved: boolean; created_at: string };
-type AppData = { apiKey: string; agents: Agent[]; ledger: LedgerEntry[]; threats: Threat[]; ledgerValid: boolean|null; settings: any | null; loading: boolean; error: string|null; apiKeys: any[]; activeSdkKeyExists?: boolean };
-type AuthResponse = { tenant_id: string; workspace_name: string; email: string; api_key: string };
-type SessionStatus = { authenticated: boolean; csrf_ready?: boolean };
-type ReadyStatus = {
-  ready: boolean;
-  store?: string;
-  database?: string;
-  ledger_valid?: boolean;
-  redis?: { configured?: boolean; connected?: boolean; mode?: string };
-  signing_key_provider?: string;
-  kms_hsm?: { configured?: boolean; status?: string; provider?: string; key_arn_configured?: boolean };
-  sso?: { oidc_configured?: boolean; scim_configured?: boolean; issuer?: string };
-};
-type EnterpriseMetrics = {
-  agents_total: number;
-  agents_active: number;
-  agents_live_connected: number;
-  avg_trust_score: number;
-  ledger_entries: number;
-  live_runtime_entries: number;
-  ledger_valid: boolean;
-  decisions_allowed: number;
-  decisions_blocked: number;
-  decisions_flagged: number;
-  threats_total: number;
-  threats_unresolved: number;
-  generated_at: string;
-};
 
 /* ═══════════════════════════ API ════════════════════════════════ */
 async function requestJson<T>(path: string, apiKey?: string, opts: RequestInit = {}): Promise<T> {
@@ -85,107 +46,6 @@ async function requestJson<T>(path: string, apiKey?: string, opts: RequestInit =
     apiKey: apiKey && apiKey !== SESSION_AUTH ? apiKey : undefined,
     ...opts,
   });
-}
-function fmtHash(h: string) { if(!h)return"-"; return `${h.slice(0,8)}…${h.slice(-8)}`; }
-function agentName(agents: Agent[], id: string|null) { return agents.find(a=>a.agent_id===id)?.name||"system"; }
-function scoreGrade(score: number | null) {
-  if (score === null) return "N/A";
-  if (score >= 97) return "A+";
-  if (score >= 93) return "A";
-  if (score >= 90) return "A-";
-  if (score >= 87) return "B+";
-  if (score >= 83) return "B";
-  if (score >= 80) return "B-";
-  if (score >= 70) return "C";
-  if (score >= 60) return "D";
-  return "F";
-}
-function scoreTone(score: number | null) {
-  if (score === null) return "var(--ink-40)";
-  if (score >= 90) return "var(--green)";
-  if (score >= 70) return "var(--amber)";
-  return "var(--red)";
-}
-const LIVE_TIMEOUT_MS = 5 * 60 * 1000;
-
-function isAgentCurrentlyLive(agent: Agent | null | undefined): boolean {
-  if (!agent || agent.status !== "active" || !agent.live_connected) return false;
-  if (isSimulationAgent(agent)) return false;
-  const lastSeenStr = agent.last_live_at || agent.last_seen;
-  if (!lastSeenStr) return false;
-  const lastSeen = new Date(lastSeenStr).getTime();
-  if (!Number.isFinite(lastSeen)) return false;
-  return Date.now() - lastSeen < LIVE_TIMEOUT_MS;
-}
-
-// Returns null when the agent has never processed a real runtime request.
-// Showing "100 / A+" for a brand-new agent that has never been seen by the shield
-// is actively misleading — a score needs real traffic to mean anything.
-function agentDisplayScore(agent: Agent): number | null {
-  if (!isAgentCurrentlyLive(agent)) return null;          // no current runtime traffic
-  if (agent.status === "revoked") return Math.min(Math.round(agent.trust_score * 100), 35);
-  return Math.round(agent.trust_score * 100);
-}
-// Lifecycle: Registered → Connected → Protected (or Disabled)
-function agentLifecycleStatus(agent: Agent): { label: string; state: "registered" | "connected" | "protected" | "disabled" } {
-  if (agent.status === "revoked") return { label: "Disabled", state: "disabled" };
-  if (isAgentCurrentlyLive(agent)) return { label: "Protected", state: "protected" };
-  if (agent.status === "active") return { label: "Registered", state: "registered" };
-  return { label: agent.status, state: "registered" };
-}
-function isSimulationAgent(agent: Agent) {
-  return (
-    Boolean(agent.is_simulation)
-    || agent.runtime_source === "simulation"
-    || agent.runtime_source === "console_proof"
-    || agent.metadata?.is_internal_proof === true
-    || agent.name === "AgentShield Proof Agent"
-    || agent.name.startsWith("sim-")
-  );
-}
-function ledgerSource(entry: LedgerEntry) {
-  return String(entry.event_data?.source || "setup");
-}
-function isLiveRuntimeEntry(entry: LedgerEntry) {
-  return ledgerSource(entry) === "live_runtime";
-}
-function isLiveRuntimeDecisionEntry(entry: LedgerEntry) {
-  return (
-    isLiveRuntimeEntry(entry)
-    && (entry.event_type === "message" || entry.event_type === "tool_call")
-    && entry.event_type !== "agent_registered"
-    && entry.event_type !== "system"
-    && !entry.event_data?.proof_test
-  );
-}
-function liveRuntimeDecisionEntries(ledger: LedgerEntry[], agents?: Agent[]) {
-  const liveAgentIds = agents
-    ? new Set(agents.filter(isAgentCurrentlyLive).map(agent => agent.agent_id))
-    : null;
-  return ledger.filter(entry => (
-    isLiveRuntimeDecisionEntry(entry)
-    && (!liveAgentIds || (entry.agent_id !== null && liveAgentIds.has(entry.agent_id)))
-  ));
-}
-function liveRuntimeStats(ledger: LedgerEntry[], agents?: Agent[]) {
-  const entries = liveRuntimeDecisionEntries(ledger, agents);
-  return {
-    entries,
-    protectedRequests: entries.length,
-    blockedThreats: entries.filter(entry => entry.verdict === "BLOCKED").length,
-    flaggedThreats: entries.filter(entry => entry.verdict === "FLAGGED").length,
-  };
-}
-function agentRuntimeStats(ledger: LedgerEntry[], agentId: string) {
-  const entries = liveRuntimeDecisionEntries(ledger).filter(entry => entry.agent_id === agentId);
-  return {
-    entries,
-    requests: entries.length,
-    threats: entries.filter(entry => entry.verdict === "BLOCKED").length,
-    lastSeen: entries.reduce<string | null>((latest, entry) => (
-      !latest || new Date(entry.created_at).getTime() > new Date(latest).getTime() ? entry.created_at : latest
-    ), null),
-  };
 }
 
 /* ═══════════════════════════ DATA HOOK ══════════════════════════ */
@@ -237,7 +97,7 @@ function useData(apiKey: string) {
     };
   };
   const revokeAgent=async(id:string)=>{ await requestJson(`/v1/agents/${id}/disable`,d.apiKey,{method:"POST"}); await load(); };
-  const spawnAgent=async(name:string,type:string,tool:string,action:string)=>{ await requestJson<Agent>("/v1/agents",d.apiKey,{method:"POST",body:JSON.stringify({name,type,permissions:{tools:{[tool]:[action]},default_action:"deny"}})}); await load(); };
+  const spawnAgent=async(name:string,type:string,tool:string,action:string)=>{ const res = await requestJson<Agent>("/v1/agents",d.apiKey,{method:"POST",body:JSON.stringify({name,type,permissions:{tools:{[tool]:[action]},default_action:"deny"}})}); await load(); return res; };
   return {data:d,reload:load,verifyLedger,runAttack,revokeAgent,spawnAgent};
 }
 
@@ -2575,6 +2435,7 @@ function LedgerPage({ setView, data, verifyLedger, onLogout }: { setView:(v:stri
 
 function LiveProtectionPage({ setView, data, reload, revokeAgent, onLogout }: { setView:(v:string)=>void; data:AppData; reload:()=>Promise<void>; revokeAgent:(id:string)=>Promise<void>; onLogout:()=>void }) {
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState("custom");
   const [editPermissions, setEditPermissions] = useState("");
@@ -2769,7 +2630,17 @@ function LiveProtectionPage({ setView, data, reload, revokeAgent, onLogout }: { 
                       <td>{row.nextAction}</td>
                       <td>
                         <div className="runtime-agent-actions">
-                          <button className="btn-secondary btn-sm" onClick={() => void navigator.clipboard.writeText(row.agent.agent_id)}>Copy ID</button>
+                          <button
+                            className="btn-secondary btn-sm"
+                            style={{ transition: "color 0.2s", color: copiedId === row.agent.agent_id ? "var(--green)" : "inherit" }}
+                            onClick={() => {
+                              void navigator.clipboard.writeText(row.agent.agent_id);
+                              setCopiedId(row.agent.agent_id);
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }}
+                          >
+                            {copiedId === row.agent.agent_id ? "✓ Copied!" : "Copy ID"}
+                          </button>
                           <button className="btn-secondary btn-sm" onClick={() => startPolicyEdit(row.agent)}>Edit policy</button>
                           <button
                             className="btn-secondary btn-sm danger"
@@ -3059,9 +2930,11 @@ function EnterprisePage({ setView, data, apiKey, onLogout }: { setView:(v:string
     },
     {
       label: "Audit Export",
-      status: "Operational",
-      detail: "Tenant-scoped audit export is available as JSON and CSV from /v1/enterprise/audit-export.",
-      ready: true,
+      status: readyStatus?.ready === true ? "Operational" : "Unavailable",
+      detail: readyStatus?.ready === true
+        ? "Tenant-scoped audit export is available as JSON and CSV from /v1/enterprise/audit-export."
+        : "Backend health check must pass before audit export is confirmed available.",
+      ready: readyStatus?.ready === true,
     },
   ];
   const readinessGaps = governanceItems
@@ -3832,7 +3705,7 @@ function AttackPage({ setView, runAttack, onLogout }: { setView:(v:string)=>void
   );
 }
 
-function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setView:(v:string)=>void; data:AppData; revokeAgent:(id:string)=>Promise<void>; spawnAgent:(n:string,t:string,tool:string,a:string)=>Promise<void>; onLogout:()=>void }) {
+function AgentsPage({ setView, data, revokeAgent, spawnAgent, onLogout }: { setView:(v:string)=>void; data:AppData; revokeAgent:(id:string)=>Promise<void>; spawnAgent:(n:string,t:string,tool:string,a:string)=>Promise<Agent>; onLogout:()=>void }) {
   const [show, setShow]   = useState(false);
   const [name, setName]   = useState("ResearchAgent");
   const [type, setType]   = useState("user_agent");
@@ -3942,12 +3815,18 @@ verdict = agent.protect("user message")`;
   const handleSpawn = async (e: React.FormEvent) => {
     e.preventDefault();
     const agentName = name;
-    await spawnAgent(agentName, type === "custom" ? customType : type, tool, action);
-    setShow(false);
-    setCustomType("");
-    // After reload, the newly created agent will be the first in the refreshed list.
-    // We wait for the state to update and capture it via displayAgentId.
-    setCreatedAgent({ name: agentName, id: displayAgentId, type: type === "custom" ? customType : type });
+    try {
+      const res = await spawnAgent(agentName, type === "custom" ? customType : type, tool, action);
+      setShow(false);
+      setCustomType("");
+      if (res && res.agent_id) {
+        setCreatedAgent({ name: res.name, id: res.agent_id, type: res.type });
+      } else {
+        setCreatedAgent({ name: agentName, id: displayAgentId, type: type === "custom" ? customType : type });
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to register agent.");
+    }
   };
 
   const activeSnippet = codeTab === "python" ? pythonSnippet : codeTab === "nodejs" ? nodeSnippet : envSnippet;
@@ -4235,14 +4114,13 @@ verdict = agent.protect("user message")`;
                   <div>
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-40)" }}>Agent ID</span>
                     <code style={{ display: "block", fontSize: 12.5, fontFamily: "monospace", color: "var(--accent)", wordBreak: "break-all", marginTop: 4 }}>
-                      {activeAgent?.agent_id || createdAgent.id || displayAgentId}
+                      {createdAgent.id}
                     </code>
                   </div>
                   <button
                     style={{ flexShrink: 0, fontSize: 11, padding: "5px 12px", borderRadius: "var(--r-xs)", border: "1px solid var(--line)", background: copiedAgentId === "modal" ? "var(--green)" : "transparent", color: copiedAgentId === "modal" ? "white" : "var(--ink-60)", cursor: "pointer", transition: "all 0.2s", fontWeight: 600, whiteSpace: "nowrap" }}
                     onClick={() => {
-                      const id = activeAgent?.agent_id || createdAgent.id || displayAgentId;
-                      void navigator.clipboard.writeText(id);
+                      void navigator.clipboard.writeText(createdAgent.id);
                       setCopiedAgentId("modal");
                       setTimeout(() => setCopiedAgentId(null), 2000);
                     }}
@@ -4832,7 +4710,7 @@ verdict = shield.protect(
 }
 
 /* ═══════════════════════════ QUICK START PAGE ═══════════════════ */
-function QuickStartPage({ setView, data, spawnAgent, reload, onLogout }: { setView: (v: string) => void; data: AppData; spawnAgent: (n: string, t: string, tool: string, a: string) => Promise<void>; reload: () => Promise<void>; onLogout: () => void }) {
+function QuickStartPage({ setView, data, spawnAgent, reload, onLogout }: { setView: (v: string) => void; data: AppData; spawnAgent: (n: string, t: string, tool: string, a: string) => Promise<Agent>; reload: () => Promise<void>; onLogout: () => void }) {
   const [activeStep, setActiveStep] = useState(1);
   const [framework, setFramework] = useState("openai");
   const [name, setName] = useState("ResearchAgent");

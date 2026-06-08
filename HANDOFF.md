@@ -1,7 +1,39 @@
 <!-- AgentShield project operation handoff registry -->
 # Agent Eval Handoff
 
+## Session Update - 2026-06-08 (frontend/src types & utils extraction)
+
+### Objective
+- Begin splitting the monolithic `frontend/src/main.tsx` (6736 lines / 344 KB) into separate modules.
+- First safe step: extract type definitions and utility functions into standalone files so they can be imported anywhere.
+
+### Actions Taken
+1. **Created `frontend/src/types.ts`**:
+   - Extracted all shared TypeScript type definitions: `Agent`, `LedgerEntry`, `Threat`, `AppData`, `AuthResponse`, `SessionStatus`, `ReadyStatus`, `EnterpriseMetrics`.
+   - All types exported with `export type`.
+2. **Created `frontend/src/utils.ts`**:
+   - Extracted all shared utility/helper functions: `fmtHash`, `agentName`, `scoreGrade`, `scoreTone`, `LIVE_TIMEOUT_MS`, `isSimulationAgent`, `isAgentCurrentlyLive`, `agentDisplayScore`, `agentLifecycleStatus`, `ledgerSource`, `isLiveRuntimeEntry`, `isLiveRuntimeDecisionEntry`, `liveRuntimeDecisionEntries`, `liveRuntimeStats`, `agentRuntimeStats`.
+   - Imports `Agent` and `LedgerEntry` from `./types`.
+   - All functions exported.
+3. **Updated `frontend/src/main.tsx`**:
+   - Added `import type { ... } from "./types"` line.
+   - Added `import { ... } from "./utils"` line.
+   - Removed the now-duplicate inline type definitions (lines 35–80 original).
+   - Removed the now-duplicate inline utility functions (lines 89–189 original).
+   - `API_URL`, `SESSION_AUTH`, `isLocalApiUrl`, `configuredApiUrl` remain in `main.tsx` (depend on `import.meta.env`).
+   - `main.tsx` reduced from 6736 → 6592 lines.
+
+### Verification
+- `cd frontend && npm run build` → ✅ 2006 modules transformed in 2.01s, zero errors.
+
+### Next Steps
+- Continue component extraction: `QuickStartPage`, `AgentsPage`, `DashboardPage`, `LiveProtectionPage`, `EvidencePage`, `EnterprisePage`, `SettingsPage` each into `frontend/src/components/`.
+- Extract `useShield` hook into `frontend/src/hooks/useShield.ts`.
+
+---
+
 ## Session Update - 2026-06-07 (OpenAPI / Swagger Auth Integration Fix)
+
 
 ### Objective
 - Fix a bug where the Swagger UI / OpenAPI documentation did not expose authentication requirements correctly, causing Swagger requests to fail with `AUTH_API_KEY_MISSING`.
@@ -4378,3 +4410,17 @@ Fix the false-live path where a user could register an agent in the website, run
   - Console proof with agent JWT writes `source=console_verification` and does not mark live.
   - Console proof without agent JWT is rejected and writes no ledger entry.
   - Legacy `context.verification=console_live_api` is classified as console proof and does not mark live.
+
+## 2026-06-08 - Expire Stale Agent Connection State on Cold Start
+
+### User Request
+Add a startup database migration/guard in the backend to expire/cleanup stale `live_connected` flags older than 5 minutes on server cold start to prevent incorrect "Connected" status displays when multiple users or developers log in to the same tenant or database schema.
+
+### Changes Made
+- Added a cold-start startup query in the `_init_schema` method in `backend/app/store.py` (after migrations and schema setup have completed) to reset the stored `live_connected` metadata state to `false` for any agent records where `last_live_at` is older than 5 minutes (the live connection timeout window), excluding the internal proof agent.
+- Wrapped the cleanup operation in a robust `try-except` block to prevent database connectivity or query errors from interrupting application cold starts.
+- Added a PostgreSQL integration test `test_startup_expired_agent_connections` to `tests/test_integration_postgres.py` to verify expiration behavior on startup (handling expired timestamps, recent timestamps, null/empty timestamps, and proof agent exclusions).
+
+### Verification
+- All 54 unit tests in the backend passed (`python3 -m unittest discover -s tests`).
+- Frontend production bundle built successfully (`cd frontend && npm run build`).

@@ -462,10 +462,19 @@ def auth_me(api_key=Depends(require_api_key)):
     tenant = store.tenants.get(api_key.tenant_id)
     if tenant is None:
         raise HTTPException(status_code=401, detail={"code": "SESSION_INVALID"})
+    
+    # Try to find the user email associated with this workspace
+    email = None
+    for u in store.users.values():
+        if u.tenant_id == api_key.tenant_id:
+            email = u.email
+            break
+
     return {
         "tenant_id": str(tenant.id),
         "workspace_name": tenant.name,
         "status": tenant.status,
+        "email": email,
     }
 
 
@@ -663,6 +672,21 @@ def get_agents(api_key=Depends(require_api_key)):
     response = list_agents(store, settings, api_key.tenant_id, tenant_priv)
     response.agents = [agent for agent in response.agents if not agent.is_simulation]
     return response
+
+
+@app.get("/v1/agents/{agent_id}")
+def get_agent_endpoint(agent_id: UUID, api_key=Depends(require_api_key)):
+    try:
+        agent = store.agents[agent_id]
+        if agent.tenant_id != api_key.tenant_id:
+            raise PermissionError("FORBIDDEN")
+        tenant_priv, _ = get_tenant_signing_key(store, api_key.tenant_id)
+        from .services import _agent_response
+        return _agent_response(store, settings, agent, tenant_priv)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"code": "AGENT_NOT_FOUND"}) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail={"code": str(exc)}) from exc
 
 
 @app.put("/v1/agents/{agent_id}")
@@ -904,14 +928,25 @@ def ledger_verify(api_key=Depends(require_api_key)):
 
 @app.get("/v1/threats")
 def threats(api_key=Depends(require_api_key)):
-    live_agent_ids = {
+    # Build the set of ALL agent IDs belonging to this tenant (not just live ones).
+    # Threats must not disappear when an agent goes offline, and must never leak
+    # to another tenant even when PostgresList returns all rows unfiltered.
+    tenant_agent_ids = {
         agent.id
         for agent in store.agents.values()
         if agent.tenant_id == api_key.tenant_id
-        and is_agent_currently_live(agent)
         and not _is_simulation_agent_record(agent)
     }
-    tenant_threats = [threat for threat in store.threat_events if threat.get("agent_id") in live_agent_ids]
+
+    def _threat_belongs_to_tenant(threat: dict) -> bool:
+        # Fast path: use tenant_id written directly on the threat dict (new events).
+        tid = threat.get("tenant_id")
+        if tid is not None:
+            return str(tid) == str(api_key.tenant_id)
+        # Fallback for legacy rows that lack tenant_id: check via agent ownership.
+        return threat.get("agent_id") in tenant_agent_ids
+
+    tenant_threats = [threat for threat in store.threat_events if _threat_belongs_to_tenant(threat)]
     return ThreatPage(threats=tenant_threats)
 
 

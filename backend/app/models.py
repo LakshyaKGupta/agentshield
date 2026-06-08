@@ -37,6 +37,7 @@ class WorkspaceUserModel(Base):
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     email = Column(Text, nullable=False, unique=True)
     password_hash = Column(Text, nullable=False)
+    role = Column(String, nullable=False, default="owner")
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
@@ -85,6 +86,7 @@ class ThreatEventModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     ledger_id = Column(BigInteger, ForeignKey("audit_ledger.id", ondelete="CASCADE"), nullable=False)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"))
     attack_type = Column(Text, nullable=False)
     confidence = Column(Numeric, nullable=False)
     evidence = Column(Text, nullable=False)

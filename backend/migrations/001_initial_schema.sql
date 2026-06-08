@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS workspace_users (
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'owner',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS threat_events (
   id UUID PRIMARY KEY,
   ledger_id BIGINT NOT NULL REFERENCES audit_ledger(id),
   agent_id UUID NOT NULL REFERENCES agents(id),
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
   attack_type TEXT NOT NULL,
   confidence NUMERIC NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   evidence TEXT NOT NULL,
@@ -208,6 +210,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_ledger_tenant_id ON audit_ledger(tenant_id)
 CREATE INDEX IF NOT EXISTS idx_audit_ledger_agent_id ON audit_ledger(agent_id);
 CREATE INDEX IF NOT EXISTS idx_threat_events_agent_id ON threat_events(agent_id);
 CREATE INDEX IF NOT EXISTS idx_threat_events_ledger_id ON threat_events(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_threat_events_tenant_id ON threat_events(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_trust_history_agent_id ON trust_history(agent_id);
 CREATE INDEX IF NOT EXISTS idx_cryptographic_keys_tenant_id ON cryptographic_keys(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_tenant_id ON invitations(tenant_id);

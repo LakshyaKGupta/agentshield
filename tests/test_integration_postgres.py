@@ -175,6 +175,101 @@ class PostgresIntegrationTests(unittest.TestCase):
         ledger_status = verify_ledger(self.store)
         self.assertTrue(ledger_status.valid)
 
+    def test_startup_expired_agent_connections(self) -> None:
+        from datetime import datetime, timezone, timedelta
+        from psycopg.types.json import Json
+        
+        tenant = self.store.seed_tenant("Startup Cleanup Workspace")
+        
+        agent_expired_id = uuid4()
+        agent_recent_id = uuid4()
+        agent_null_id = uuid4()
+        agent_proof_id = uuid4()
+        
+        now = datetime.now(timezone.utc)
+        expired_time = (now - timedelta(minutes=10)).isoformat()
+        recent_time = (now - timedelta(minutes=2)).isoformat()
+        
+        with self.store._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO agents (id, tenant_id, name, type, permissions, metadata, score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    agent_expired_id,
+                    tenant.id,
+                    "expired-agent",
+                    "user_agent",
+                    Json({"tools": {}, "default_action": "deny"}),
+                    Json({"live_connected": True, "last_live_at": expired_time}),
+                    100.0
+                )
+            )
+            conn.execute(
+                """
+                INSERT INTO agents (id, tenant_id, name, type, permissions, metadata, score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    agent_recent_id,
+                    tenant.id,
+                    "recent-agent",
+                    "user_agent",
+                    Json({"tools": {}, "default_action": "deny"}),
+                    Json({"live_connected": True, "last_live_at": recent_time}),
+                    100.0
+                )
+            )
+            conn.execute(
+                """
+                INSERT INTO agents (id, tenant_id, name, type, permissions, metadata, score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    agent_null_id,
+                    tenant.id,
+                    "null-agent",
+                    "user_agent",
+                    Json({"tools": {}, "default_action": "deny"}),
+                    Json({"live_connected": True, "last_live_at": None}),
+                    100.0
+                )
+            )
+            conn.execute(
+                """
+                INSERT INTO agents (id, tenant_id, name, type, permissions, metadata, score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    agent_proof_id,
+                    tenant.id,
+                    "proof-agent",
+                    "user_agent",
+                    Json({"tools": {}, "default_action": "deny"}),
+                    Json({"live_connected": True, "last_live_at": expired_time, "is_internal_proof": "true"}),
+                    100.0
+                )
+            )
+            conn.commit()
+            
+        def get_metadata(agent_id):
+            with self.store._connect() as conn:
+                res = conn.execute("SELECT metadata FROM agents WHERE id = %s", (agent_id,)).fetchone()
+                return res["metadata"]
+                
+        self.assertTrue(get_metadata(agent_expired_id).get("live_connected"))
+        self.assertTrue(get_metadata(agent_recent_id).get("live_connected"))
+        self.assertTrue(get_metadata(agent_null_id).get("live_connected"))
+        self.assertTrue(get_metadata(agent_proof_id).get("live_connected"))
+        
+        self.store._init_schema()
+        
+        self.assertFalse(get_metadata(agent_expired_id).get("live_connected"))
+        self.assertTrue(get_metadata(agent_recent_id).get("live_connected"))
+        self.assertFalse(get_metadata(agent_null_id).get("live_connected"))
+        self.assertTrue(get_metadata(agent_proof_id).get("live_connected"))
+
 
 if __name__ == "__main__":
     unittest.main()

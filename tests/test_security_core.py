@@ -291,6 +291,44 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertEqual(revoked.status, "revoked")
         self.assertEqual(revoked.token, "")
 
+    def test_get_agent_detail_endpoint(self) -> None:
+        from fastapi.testclient import TestClient
+        from backend.app.main import app
+        from unittest.mock import patch
+        from uuid import uuid4
+        from backend.app.store import AgentRecord
+        from backend.app.contracts import PermissionManifest
+
+        client = TestClient(app)
+        with patch("backend.app.main.store", self.store):
+            headers = {"X-AgentShield-API-Key": self.api_key}
+            
+            # Fetch valid agent
+            resp = client.get(f"/v1/agents/{self.agent.agent_id}", headers=headers)
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.json()["name"], self.agent.name)
+            self.assertEqual(resp.json()["agent_id"], str(self.agent.agent_id))
+
+            # Fetch non-existent agent -> expects 404
+            resp_404 = client.get(f"/v1/agents/{uuid4()}", headers=headers)
+            self.assertEqual(resp_404.status_code, 404)
+
+            # Fetch agent from distinct tenant -> expects 403
+            tenant_b = self.store.seed_tenant("Distinct Workspace B")
+            self.store.persist_tenant(tenant_b)
+            
+            agent_b = AgentRecord(
+                id=uuid4(),
+                tenant_id=tenant_b.id,
+                name="agent-b",
+                type="user_agent",
+                permissions=PermissionManifest(tools={}, default_action="deny")
+            )
+            self.store.agents[agent_b.id] = agent_b
+            
+            resp_403 = client.get(f"/v1/agents/{agent_b.id}", headers=headers)
+            self.assertEqual(resp_403.status_code, 403)
+
     def test_agent_list_excludes_session_keys_from_sdk_status(self) -> None:
         agents_before_sdk = list_agents(self.store, self.settings, self.tenant.id, self.private_key)
         self.assertFalse(agents_before_sdk.active_sdk_key_exists)
